@@ -88,25 +88,29 @@ sizes, padding, and tag bytes are discrete chunks that can make a sub-0.5-kbps l
 impossible — `--podcast-strict` should fail loudly rather than silently miss. `--podcast-scope
 file` matters most for short clips (tags move the average).
 
-## Implementation notes (v1 shipped: `tools/podcast/`)
+## Implementation notes (v2 shipped: `tools/podcast/`, adaptive landing)
 
 - Frame-bitrate parser: built in-tool (MPEG1 Layer III header walk, ID3v2 skip; the Xing/Info
   frame is counted — it is a real stream frame, identical for every candidate, so it cancels).
-- Grid: ~28 candidates (effort sweep, contiguous ±ABR mean nudges, lowpass/highpass sweeps,
-  CBR floor, VBR probes). Two things the first real runs taught us:
-  1. **ABR undershoots on easy material** (a cappella measured 189 for `--abr 192`), so mean
-     nudges must go *both* ways and be contiguous — integer requests move the measured average
-     ~0.8 kbps/step, and a gap in the sweep can strand the 0.5-wide window between two requests.
-  2. **CBR at the target is the guaranteed-legal floor** (padding holds exactly the nominal
-     rate). When no integer ABR request lands in the window — which happens — CBR turns
-     "no legal candidate" into a legitimate winner. ABR usually beats it when both land;
-     measurement decides.
-- Validated behaviors on real material (Tom's Diner): stereo-192 winner was
-  `--abr 192 --quality-max --lowpass 16` (+0.38 dB over plain ABR at equal measured bitrate);
-  mono-96 winner `-b 96 --quality-max --lowpass 15.5`. The meter correctly *rejects* over-eager
-  lowpass (12/14 kHz cuts scored +18 dB NMR on this material — audible dulling), so the filter
-  choice is measured per input, exactly as intended. `--quality-max` beat `-q4` by 0.48 dB at
-  CBR96 mono — the Finding 3 objective change pays off downstream.
+- **v2 architecture — land every flavor, then compare.** v1 used a fixed grid of requests and
+  hoped some landed in the window; real runs showed ABR undershoots easy material (~189 for
+  `--abr 192`) and integer requests move the measured average ~0.8 kbps/step, stranding the
+  0.5-wide window between steps. v2 instead gives each *flavor* (mode × effort × filter over
+  an ABR / CBR / true-VBR foundation) its own **adaptive landing search**: fractional `--abr`
+  requests (the v4 float-ABR API) bisected until the *measured* average lands in-window;
+  fractional `-V` bisected likewise for true VBR; CBR exact by construction. ~18 flavors, each
+  landed then scored — so the comparison is always at (nearly) equal measured bitrate, and VBR
+  gets a fair shot instead of depending on a lucky fixed probe.
+- **Headline result (Tom's Diner, both presets): true VBR wins big once it can land.**
+  Stereo-192: `-V 1.08` measured 191.70 kbps, meanNMR **−14.54** vs −12.39 for the best
+  ABR/CBR flavor (**+2.1 dB**). Mono-96: `-V 2.5` at 95.78 kbps, **−9.26** vs −7.71
+  (**+1.6 dB**). Frame-by-frame psychoacoustic bit placement beats average-tracking at equal
+  measured bitrate — the whole reason VBR needed to be in the search, findable by bisection.
+- Other validated behaviors: the meter correctly *rejects* over-eager lowpass (12/14 kHz cuts
+  scored +18 dB NMR on this material — audible dulling) while rewarding gentle ones
+  (15.5–16 kHz best among ABR/CBR flavors); `--quality-max` beat `-q4` by ~0.5 dB in-window;
+  fractional requests landed flavors that integers never could (`--abr 195.38`,
+  `--abr 98.3`, …).
 
 ## Open questions / next
 

@@ -325,12 +325,18 @@ result to `output/lame_fix.exe`, `git checkout master && build.cmd`, copy to
       mean and audible fraction improved — confirm inaudible).
 - [ ] Revisit VBR under `--quality-max` with an equal-size methodology (objective change is
       currently scoped to CBR/ABR only).
-- [x] Podcast constrained-optimizer v1 (`tools/podcast/`, design + implementation notes in
-      `docs/podcast-optimizer-design.md`): parallel legal-candidate search over ~28
-      standards-compliant settings; measured-average window `[target−0.5, target]`; CBR floor
-      guarantees a legal winner; scored by the `nmr` meter. First real runs picked
-      `--abr 192 --quality-max --lowpass 16` (stereo) and `-b 96 --quality-max --lowpass 15.5`
-      (mono) on a cappella voice — measured, not assumed.
+- [x] Podcast constrained-optimizer v2 (`tools/podcast/`, design + implementation notes in
+      `docs/podcast-optimizer-design.md`): every flavor (effort × filter over ABR/CBR/true-VBR)
+      is *landed* in `[target−0.5, target]` by an adaptive search on its rate control, then
+      scored by the `nmr` meter. **True VBR, landed via fractional `-V` bisection, wins big at
+      equal measured bitrate** (Tom's Diner: −14.54 vs −12.39 stereo-192; −9.26 vs −7.71
+      mono-96) — frame-by-frame bit placement beats average-tracking.
+- [x] **Fractional ABR** (v4 API addition, regress-gated 70/70): `--abr 191.5` /
+      `lame_set_VBR_mean_bitrate_float`. MP3's average bitrate mixes discrete frame sizes, so
+      fractional means were always physically reachable — the integer-only API was history, not
+      format. Integral values take the legacy integer arithmetic verbatim (bit-identical);
+      fractional ones refine the per-frame target in `calc_target_bits`. Measured: sizes
+      strictly monotone through 191 → 191.25 → 191.5 → 191.75 → 192.
 - [ ] Multithreading (bit-exact) to *fund* the expensive search; AVX2 SIMD on the scalar hot
       loops; modern CMake/CI; fuzz the decoder.
 
