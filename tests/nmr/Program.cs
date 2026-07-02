@@ -198,18 +198,35 @@ static class Program
 
     static int BestOffset(float[] a, float[] b, int maxOff)
     {
-        // Coarse cross-correlation on a strong central window to find integer delay.
+        // Coarse cross-correlation to find the integer encode+decode delay. The window must
+        // sit on ENERGY: on sparse material (castanet bursts) the file's middle can be
+        // silence, making every offset's dot product noise and the argmax garbage -- that
+        // misaligned even self-comparisons to -59 dB (caught by the Linux CI smoke test,
+        // reproduced identically on Windows). Anchor the window at the highest-energy region
+        // of the reference instead, and only move off zero offset for a decisive win so
+        // degenerate content cannot invent a delay.
         int win = Math.Min(1 << 15, Math.Min(a.Length, b.Length) / 2);
-        int ca = a.Length / 2 - win / 2;
-        double best = double.NegativeInfinity; int bestOff = 0;
+        int step = Math.Max(1, win / 2);
+        int ca = Math.Max(0, a.Length / 2 - win / 2);
+        double bestEn = -1;
+        for (int p = maxOff; p + win + maxOff < a.Length; p += step)
+        {
+            double en = 0;
+            for (int i = 0; i < win; i += 8) en += (double)a[p + i] * a[p + i];
+            if (en > bestEn) { bestEn = en; ca = p; }
+        }
+        double best = double.NegativeInfinity, dot0 = 0; int bestOff = 0;
         for (int off = -maxOff; off <= maxOff; off += 1)
         {
             int cb = ca + off;
             if (cb < 0 || cb + win >= b.Length) continue;
             double dot = 0;
             for (int i = 0; i < win; i += 8) dot += (double)a[ca + i] * b[cb + i];
+            if (off == 0) dot0 = dot;
             if (dot > best) { best = dot; bestOff = off; }
         }
+        if (bestOff != 0 && best <= dot0 * 1.001)
+            bestOff = 0;
         return bestOff;
     }
 

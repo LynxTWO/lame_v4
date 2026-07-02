@@ -34,18 +34,27 @@ for wav in "$CORPUS"/*.wav; do
     done
 done
 
-# Perceptual sanity (needs dotnet + tests/nmr): self-transparency and bitrate monotonicity.
+# Perceptual sanity (needs dotnet + tests/nmr). Two checks that hold on the SYNTHETIC corpus:
+#   1. self-transparency on a dense file (meter identity: parsing + alignment + ~zero error);
+#   2. a "not garbage" ceiling on a real encode's score (catches catastrophic breakage:
+#      silence output, wrong sample rate, byte-order bugs).
+# Deliberately NOT checked here: bitrate monotonicity. It holds on real music (validated in
+# FINDINGS §2b) but NOT per-file on synthetic torture signals -- castanets/pink noise/tone
+# mixes measure ~equal at 128 and 320 kbps (pre-echo/tonality dominated, not bit-starved),
+# and mostly-silent files bottom out at the meter's epsilon-vs-tiny-mask floor (~-59 dB),
+# so naive thresholds here produce false failures (found by the first live CI run).
 if command -v dotnet >/dev/null 2>&1; then
     dotnet build "$HERE/nmr" -c Release -v quiet >/dev/null
     NMR="$HERE/nmr/bin/Release/net8.0/nmr"
-    wav=$(ls "$CORPUS"/*.wav | head -1)
-    self=$("$NMR" "$wav" "$wav" | awk '{print $1}')
-    awk -v s="$self" 'BEGIN{ exit !(s < -90) }' || { echo "SELF-CHECK FAIL: nmr($wav,$wav)=$self (want < -90 dB)"; fail=1; }
-    base=$(basename "$wav" .wav)
-    lo=$("$NMR" "$wav" "$WORK/$base.b128.wav" | awk '{print $1}')
-    hi=$("$NMR" "$wav" "$WORK/$base.b320.wav" | awk '{print $1}')
-    awk -v a="$hi" -v b="$lo" 'BEGIN{ exit !(a < b) }' || { echo "MONOTONICITY FAIL: 320kbps ($hi) not cleaner than 128kbps ($lo)"; fail=1; }
-    echo "nmr sanity: self=$self dB, cbr128=$lo dB, cbr320=$hi dB"
+    wav="$CORPUS/music_mix.wav"    # densest corpus file: no near-silent stretches
+    if [ -f "$wav" ]; then
+        base=$(basename "$wav" .wav)
+        self=$("$NMR" "$wav" "$wav" | awk '{print $1}')
+        awk -v s="$self" 'BEGIN{ exit !(s < -90) }' || { echo "SELF-CHECK FAIL: nmr($wav,$wav)=$self (want < -90 dB)"; fail=1; }
+        enc=$("$NMR" "$wav" "$WORK/$base.b128.wav" | awk '{print $1}')
+        awk -v e="$enc" 'BEGIN{ exit !(e < 20) }' || { echo "GARBAGE-CHECK FAIL: nmr(orig, cbr128)=$enc (want < +20 dB; correct decode measures ~+14 on this synthetic)"; fail=1; }
+        echo "nmr sanity: self=$self dB, cbr128=$enc dB"
+    fi
 fi
 
 if [ "$fail" -ne 0 ]; then echo "SMOKE: FAILURES (see above)"; exit 1; fi
