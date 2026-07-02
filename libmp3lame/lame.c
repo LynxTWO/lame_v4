@@ -467,36 +467,44 @@ lame_init_qval(lame_global_flags * gfp)
     case 0:
         if (cfg->noise_shaping == 0)
             cfg->noise_shaping = 1;
-        if (gfc->sv_qnt.substep_shaping == 0)
-            gfc->sv_qnt.substep_shaping = 2;
-        cfg->noise_shaping_amp = 2;
         cfg->noise_shaping_stop = 1;
         if (cfg->subblock_gain == -1)
             cfg->subblock_gain = 1;
         cfg->use_best_huffman = 1; /*type 2 disabled because of it slowness,
                                       in favor of full outer loop search */
-        cfg->full_outer_loop = 1;
+        /* v4 fix for the LAME 3.100 CBR/ABR quality regression: q0's aggressive noise shaping
+           is tuned for VBR (outer_loop iterates freely to convergence). Under a fixed CBR/ABR
+           bit budget the loop stops early, so stock q0 is measurably WORSE than q4 on real
+           music. Two culprits: noise_shaping_amp=2 amplifies only the single worst band per
+           iteration, and substep_shaping=2 turns on pseudohalf half-stepping -- both starve
+           the early-terminating constrained search. For bit-constrained modes, use the
+           previously-unused coarse-then-fine amp=3 refine path (full_outer_loop=0) and leave
+           substep_shaping off. VBR is unchanged. Validated on synthetic signals, real music,
+           EBU SQAM (59/70 better), and human ABX (15/16, p=0.0003). See FINDINGS.md Finding 1. */
+        if (cfg->vbr == vbr_off || cfg->vbr == vbr_abr) {
+            cfg->noise_shaping_amp = 3;
+            cfg->full_outer_loop = 0;
+            /* deliberately do NOT enable substep_shaping for CBR/ABR */
+        }
+        else {
+            if (gfc->sv_qnt.substep_shaping == 0)
+                gfc->sv_qnt.substep_shaping = 2;
+            cfg->noise_shaping_amp = 2;
+            cfg->full_outer_loop = 1;
+        }
         break;
     }
 
-    /* v4 maximum-effort mode ("--quality-max"): starts from the q0 config above, then adds
-       more search. Runs after the per-quality switch (and after the gfp->cfg copies), so these
-       assignments win. Opt-in only -- untouched when quality_max is 0. */
+    /* v4 maximum-effort mode ("--quality-max"): starts from the q0 config above (which already
+       includes the CBR/ABR noise-shaping fix), then adds more search. Runs after the per-quality
+       switch and after the gfp->cfg copies, so these assignments win. Opt-in only. */
     cfg->quality_max = gfp->quality_max;
     if (gfp->quality_max) {
         /* (1) the thorough in-loop Huffman search q0 disables for speed (best cost model). */
         cfg->use_best_huffman = 2;
-        /* (2) for bit-constrained modes, the coarse-then-fine noise shaping -- which also
-           fixes the 3.100 CBR/ABR regression where q0's VBR-tuned amp=2 + substep shaping
-           misbehave when the outer loop stops early on a fixed bit budget. VBR keeps q0's
-           amp=2 + full outer loop. */
-        if (cfg->vbr == vbr_off || cfg->vbr == vbr_abr) {
-            cfg->noise_shaping_amp = 3;
-            cfg->full_outer_loop = 0;
-            gfc->sv_qnt.substep_shaping = 0;
-        }
-        /* (3) the deeper noise-allocation search is enabled via cfg->quality_max and read in
-           quantize.c (outer_loop). */
+        /* (2) the deeper noise-allocation search is enabled via cfg->quality_max and read in
+           quantize.c (outer_loop). The CBR/ABR coarse-then-fine shaping is already applied by
+           the q0 case above (now the default), so no shaping override is needed here. */
     }
 }
 

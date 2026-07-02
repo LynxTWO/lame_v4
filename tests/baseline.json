@@ -25,8 +25,8 @@
     "mp3len": 96548
   },
   "castanet_bursts|q0_cbr320": {
-    "mp3": "937f46fbf8e3ee36eead36af97f6e445319807c7ec5157e20a34a8c59ec06c19",
-    "pcm": "4d427e225a84b3e6b207f5f5cab7bf6d0e74dfbe7fede2f91cfe9301b1b9425e",
+    "mp3": "3eeed227a06bab12804bef11475821175ac240a097850f6ff0f26f2b88d4c036",
+    "pcm": "21ec81c202128d5ff7d0732c1f281ab892968af34d791c8d5412b0e8dea56f11",
     "mp3len": 241371
   },
   "castanet_bursts|abr192": {
@@ -60,8 +60,8 @@
     "mp3len": 80666
   },
   "hf_square|q0_cbr320": {
-    "mp3": "cda3b5098c7856a5b1ece264814d612aabe34ada2636ec05afaa1aa5255d298a",
-    "pcm": "04d64d24b0639e9c5f08095fd6a9bf989cacbe14d1a774e5c2643addb78699f3",
+    "mp3": "65e531a1f0b83dedc743db0a6cd42a3b44e51c6868491a188a38a1c5104aeb03",
+    "pcm": "cebe5c934686ebeae18c5f88b302bbe2360b23eee1965fd2ce49767b4daaf69b",
     "mp3len": 201665
   },
   "hf_square|abr192": {
@@ -95,8 +95,8 @@
     "mp3len": 96548
   },
   "impulse_train|q0_cbr320": {
-    "mp3": "88d30db1fba519c64e216c2d9c5bc1a47f963ecf5842af9e76660e5a5cb434d1",
-    "pcm": "ae79fd25e04f48343126c7d83560ddcdca3dc35f858c2b0ee10f4ad79539c943",
+    "mp3": "91c9642046e920259ee8a4ae7ad06de39e3c73afa17db8e05b0af6a8a346b1b7",
+    "pcm": "c3ad81fae48bce3350a711cbbec788ef9ab38353b4fdd6fa64065b86b0d94ff5",
     "mp3len": 241371
   },
   "impulse_train|abr192": {
@@ -130,8 +130,8 @@
     "mp3len": 160496
   },
   "log_sweep|q0_cbr320": {
-    "mp3": "cd4eeca69017ae6e45cc7f622cea5238b8f8b8a51171ca4680298f9a498c83d0",
-    "pcm": "770177a5dc9ec618378d88552ab1b6f1b9280aa54de3a56c50f41eed98d57aad",
+    "mp3": "7a382d091a6c3219ea1a3def3f5242d0d235e955b9bd82f990aa4eb67ac8348b",
+    "pcm": "807b40c6bfdd9946c1ac2e396dafc3b8cc70199b6530f1d78e78eaceb4e28d43",
     "mp3len": 401240
   },
   "log_sweep|abr192": {
@@ -165,8 +165,8 @@
     "mp3len": 320574
   },
   "music_mix|q0_cbr320": {
-    "mp3": "a135de95684b5e77e3f6fcd58574edee08d640da08f2e7d1cf7815d1807afb58",
-    "pcm": "7fb1b118e7f4646dd82017dea0cb239ebffd175f00b78e23abcd684c1e9797e3",
+    "mp3": "252b5967a27f88690a92c707ded9dfe8a28b4743d42f393126c6872b0c9123b4",
+    "pcm": "2a8d2b995a01992c4ca5266be18f18737c23897ecabc1aad61bfa33028479ac9",
     "mp3len": 801436
   },
   "music_mix|abr192": {
@@ -200,8 +200,8 @@
     "mp3len": 128731
   },
   "pink_noise|q0_cbr320": {
-    "mp3": "2160753c63ff4dbda89a8ce310ebc66f1d3b98abb42394cbd5efd22105198001",
-    "pcm": "0e6e49978f894fd1d784edcde3cda56580563261be67c8a62a2b2909b0305dea",
+    "mp3": "6e78952fdc9d0163f3e0d056f4bfe15cff1bff098035b1486b1960d34fe24438",
+    "pcm": "0ea5d1bb914b21095d098f3a82e9f13ca7ca0862ed5b081a310107d63a703ccd",
     "mp3len": 321828
   },
   "pink_noise|abr192": {
@@ -235,8 +235,8 @@
     "mp3len": 160496
   },
   "plucked_harmonics|q0_cbr320": {
-    "mp3": "3ff9c3580d4b16afdae305024acfbd3aa78e60feb5db53fdcd30098f765bf96d",
-    "pcm": "208014b440f8e1b137446ddbe057c3e6475aa6a2e38192e09056f719832233a0",
+    "mp3": "438a99172e5c2340003752b6b03f6774cfd78d4b2ef2863d91b66198c3eb630c",
+    "pcm": "19129af409ee41b9c9a3398e1d74384c4a30408c826f8a38ea47ef232f4d3647",
     "mp3len": 401240
   },
   "plucked_harmonics|abr192": {
@@ -270,8 +270,8 @@
     "mp3len": 96548
   },
   "silence_clicks|q0_cbr320": {
-    "mp3": "21eb8531a0a668fbcca380161d4f340ba8fe90398d52696209c032113a5e5b19",
-    "pcm": "9c5f0a6dd266735570904ab41a718f58d02dc92a26264f19165ff964aabc31ba",
+    "mp3": "09e2e5f10c98503d56efa669ac3bb4936d8f1d2556becb746de86c14627ef086",
+    "pcm": "2d53c6dc4535dad7d0ecdbc147c6f4b3ffad38a1d6a75ef95cc1541407503417",
     "mp3len": 241371
   },
   "silence_clicks|abr192": {
@@ -305,8 +305,8 @@
     "mp3len": 128731
   },
   "sparse_hf_tones|q0_cbr320": {
-    "mp3": "5ecd65b2aed72d7bd1e0a1a6f35044696f0592215e9d566075f9ab590987cd3a",
-    "pcm": "6114d4d742f20cae43bba6bf3cc0558e6d92d5bdef7dafa2c4e4c50f91b32621",
+    "mp3": "3062a2d5729d4ccfb1162e470cafad118abe88cdc6a6e4aa244a81eecbfcc51b",
+    "pcm": "373a85fbbdf35164f10684e4e3d4dccbd4ddfd90fab9d6f559ec422f5c9ba11e",
     "mp3len": 321828
   },
   "sparse_hf_tones|abr192": {
@@ -340,8 +340,8 @@
     "mp3len": 96548
   },
   "white_noise|q0_cbr320": {
-    "mp3": "89902e5d62db97e370a7ba3e136c8d02284334e139b9b30f685d24f636f20ff5",
-    "pcm": "6caa2e09ffa816b460e335385f25e4fe879bfcc1f8d6099bb2d286b0a9804f4d",
+    "mp3": "e3417202bf7d1c9cd37c70b944d2388154fb8b4ad7b72f56e6c1f319bd42a048",
+    "pcm": "c4dc19fdf81c5aaaaca80a98f61146052511d1886be958f3b0187840ada21016",
     "mp3len": 241371
   },
   "white_noise|abr192": {
