@@ -1990,9 +1990,19 @@ quantize_worker_main(void *arg)
         WaitForSingleObject((HANDLE) gfc->qnt_worker.ev_go, INFINITE);
         if (gfc->qnt_worker.exit_flag)
             break;
-        quantize_gr_ch(gfc, (const III_psy_ratio(*)[2]) gfc->qnt_worker.job_ratio,
-                       gfc->qnt_worker.job_gr, 1,
-                       gfc->qnt_worker.job_targ_bits, gfc->qnt_worker.job_silence);
+        if (gfc->qnt_worker.job_gr < 0) {
+            /* whole-frame job: channel 1's granules in order (the bin_search CurrentStep/
+               OldValue chain for a channel runs granule 0 -> granule 1, same as sequential) */
+            quantize_gr_ch(gfc, (const III_psy_ratio(*)[2]) gfc->qnt_worker.job_ratio,
+                           0, 1, gfc->qnt_worker.job_targ_bits, gfc->qnt_worker.job_silence);
+            quantize_gr_ch(gfc, (const III_psy_ratio(*)[2]) gfc->qnt_worker.job_ratio,
+                           1, 1, gfc->qnt_worker.job_targ_bits1, gfc->qnt_worker.job_silence);
+        }
+        else {
+            quantize_gr_ch(gfc, (const III_psy_ratio(*)[2]) gfc->qnt_worker.job_ratio,
+                           gfc->qnt_worker.job_gr, 1,
+                           gfc->qnt_worker.job_targ_bits, gfc->qnt_worker.job_silence);
+        }
         SetEvent((HANDLE) gfc->qnt_worker.ev_done);
     }
     return 0;
@@ -2054,6 +2064,26 @@ quantize_both_channels(lame_internal_flags * gfc, const III_psy_ratio ratio[2][2
     WaitForSingleObject((HANDLE) gfc->qnt_worker.ev_done, INFINITE);
 }
 
+/* Whole-frame variant (ABR, mode_gr==2): each thread runs one CHANNEL's two granules in
+   order, so channel imbalance amortizes across the frame and there is one join instead of
+   two. Only legal when every granule's bit target is known up front (ABR's calc_target_bits)
+   -- CBR computes granule 1's targets from granule 0's reservoir accounting and must keep
+   the per-granule join. */
+static void
+quantize_frame_channels(lame_internal_flags * gfc, const III_psy_ratio ratio[2][2],
+                        int targ_bits[2][2], int analog_silence_bits)
+{
+    gfc->qnt_worker.job_ratio = ratio;
+    gfc->qnt_worker.job_gr = -1;
+    gfc->qnt_worker.job_targ_bits = targ_bits[0][1];
+    gfc->qnt_worker.job_targ_bits1 = targ_bits[1][1];
+    gfc->qnt_worker.job_silence = analog_silence_bits;
+    SetEvent((HANDLE) gfc->qnt_worker.ev_go);
+    quantize_gr_ch(gfc, ratio, 0, 0, targ_bits[0][0], analog_silence_bits);
+    quantize_gr_ch(gfc, ratio, 1, 0, targ_bits[1][0], analog_silence_bits);
+    WaitForSingleObject((HANDLE) gfc->qnt_worker.ev_done, INFINITE);
+}
+
 #else  /* !_WIN32: no worker yet; encoder always runs the sequential path */
 
 int
@@ -2069,13 +2099,24 @@ lame_quantize_worker_stop(lame_internal_flags * gfc)
     gfc->qnt_worker.running = 0;
 }
 
-/* Never reached (running is always 0 here); sequential fallback keeps the call site portable. */
+/* Never reached (running is always 0 here); sequential fallbacks keep the call sites portable. */
 static void
 quantize_both_channels(lame_internal_flags * gfc, const III_psy_ratio ratio[2][2],
                        int gr, int targ_bits_ch0, int targ_bits_ch1, int analog_silence_bits)
 {
     quantize_gr_ch(gfc, ratio, gr, 0, targ_bits_ch0, analog_silence_bits);
     quantize_gr_ch(gfc, ratio, gr, 1, targ_bits_ch1, analog_silence_bits);
+}
+
+static void
+quantize_frame_channels(lame_internal_flags * gfc, const III_psy_ratio ratio[2][2],
+                        int targ_bits[2][2], int analog_silence_bits)
+{
+    int     gr;
+    for (gr = 0; gr < 2; gr++) {
+        quantize_gr_ch(gfc, ratio, gr, 0, targ_bits[gr][0], analog_silence_bits);
+        quantize_gr_ch(gfc, ratio, gr, 1, targ_bits[gr][1], analog_silence_bits);
+    }
 }
 
 #endif /* _WIN32 */
@@ -2123,6 +2164,31 @@ ABR_iteration_loop(lame_internal_flags * gfc, const FLOAT pe[2][2],
 
     calc_target_bits(gfc, pe, ms_ener_ratio, targ_bits, &analog_silence_bits, &max_frame_bits);
 
+    if (use_worker && cfg->mode_gr == 2) {
+        /* v4 channel-parallel path, frame-batched: ABR knows every granule's bit target up
+           front (calc_target_bits above), so each thread runs one channel's two granules in
+           order -- the per-channel bin_search CurrentStep/OldValue chain is preserved, channel
+           imbalance amortizes across the frame, and there is one join instead of two. All
+           masking_lower writes happen first in sequential loop order (the search never reads
+           it; only the last write survives to the next frame's psymodel, same as sequential),
+           and ms_convert runs for both granules before any search touches their xr. The
+           ordered finish (scfsi + reservoir) stays sequential. Bit-identical to the loop
+           below. */
+        for (gr = 0; gr < 2; gr++) {
+            if (gfc->ov_enc.mode_ext == MPG_MD_MS_LR) {
+                ms_convert(&gfc->l3_side, gr);
+            }
+            set_masking_lower(gfc, gr, 0);
+            set_masking_lower(gfc, gr, 1);
+        }
+        quantize_frame_channels(gfc, ratio, targ_bits, analog_silence_bits);
+        for (gr = 0; gr < 2; gr++) {
+            iteration_finish_one(gfc, gr, 0);
+            iteration_finish_one(gfc, gr, 1);
+        }
+        goto resv_end;
+    }
+
     /*  encode granules
      */
     for (gr = 0; gr < cfg->mode_gr; gr++) {
@@ -2131,10 +2197,7 @@ ABR_iteration_loop(lame_internal_flags * gfc, const FLOAT pe[2][2],
             ms_convert(&gfc->l3_side, gr);
         }
         if (use_worker) {
-            /* v4 channel-parallel path: masking_lower writes stay on this thread in loop
-               order (workers never read it), both channels quantize concurrently, then the
-               ordered finish (scfsi + reservoir) runs sequentially. Bit-identical to the
-               sequential branch below. */
+            /* v4 channel-parallel path, per-granule (mode_gr==1 sessions). */
             set_masking_lower(gfc, gr, 0);
             set_masking_lower(gfc, gr, 1);
             quantize_both_channels(gfc, ratio, gr, targ_bits[gr][0], targ_bits[gr][1],
@@ -2164,6 +2227,7 @@ ABR_iteration_loop(lame_internal_flags * gfc, const FLOAT pe[2][2],
         }               /* ch */
     }                   /* gr */
 
+  resv_end:
     /*  find a bitrate which can refill the resevoir to positive size.
      */
     for (eov->bitrate_index = cfg->vbr_min_bitrate_index;

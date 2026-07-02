@@ -87,6 +87,8 @@ Implement (1)+(2) as an opt-in increment under the existing `--threads` flag *on
 default/VBR single-file latency matters to a real workflow; otherwise the next
 quality-per-effort win is quality-max v3, which makes the already-shipped quantization
 threading more valuable automatically. Either way, nothing in the analysis front blocks the
-v3 work. (Also worth cutting: the per-granule worker join overhead — batching dispatch per
-frame for ABR, whose granule targets are precomputed, would lift the measured 1.17× at
-CBR128 toward its ~1.9× ceiling.)
+v3 work. (Also worth cutting: the per-granule worker join overhead. ABR precomputes all
+granule bit targets per frame, so its worker can run channel 1's *whole frame* — both
+granules, in order, preserving the CurrentStep chain — amortizing channel imbalance across
+granules and halving sync points. CBR cannot: granule 1's targets depend on granule 0's
+reservoir accounting, so its 1.17× at 128 kbps is close to structural.)

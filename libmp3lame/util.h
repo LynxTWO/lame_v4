@@ -515,8 +515,11 @@ extern  "C" {
             void   *ev_go;          /* auto-reset event: job ready */
             void   *ev_done;        /* auto-reset event: job finished */
             void const *job_ratio;  /* const III_psy_ratio (*)[2] of the current frame */
-            int     job_gr;
-            int     job_targ_bits;
+            int     job_gr;         /* granule index, or -1 = whole-frame job (both granules
+                                       of channel 1 in order; ABR only, where all targets are
+                                       known up front) */
+            int     job_targ_bits;  /* granule 0's (or the single granule's) ch1 target */
+            int     job_targ_bits1; /* granule 1's ch1 target (whole-frame jobs) */
             int     job_silence;    /* analog_silence_bits, or -1 for CBR semantics */
             int     exit_flag;
             int     running;

@@ -67,16 +67,10 @@
 	typedef float  float32_t;
 	typedef double float64_t;
 #elif defined (__GNUC__)
-#define __int8_t_defined
-#define uint8_t unsigned char
-#define uint16_t unsigned short
-#define uint32_t unsigned int
-#define uint64_t unsigned long long
-
-#define int8_t signed char
-#define int16_t signed short
-#define int32_t signed int
-#define int64_t signed long long
+/* v4: the historical macro definitions of the stdint names (#define uint8_t unsigned char
+   etc.) collide fatally with modern glibc's own typedefs in bits/stdint-intn.h. Every gcc
+   or clang new enough to build this has C99 <stdint.h>; use it. */
+#include <stdint.h>
 #endif
 
 typedef long double ieee854_float80_t;
