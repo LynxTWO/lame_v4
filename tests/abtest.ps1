@@ -14,6 +14,9 @@ param(
     [string]$A = "$PSScriptRoot\..\output\lame.exe",
     [string]$B = "$PSScriptRoot\..\output\lame.exe",
     [string]$Setting = '-b192',
+    # Optional: different settings for side B (same binary or different). Lets the harness
+    # compare SETTINGS (e.g. '-q 4 -b 128' vs '-q 0 -b 128') as well as builds.
+    [string]$SettingB = '',
     [string]$Corpus = "$PSScriptRoot\corpus",
     [string]$Work = "$PSScriptRoot\out",
     [string]$Nmr = "$PSScriptRoot\nmr\bin\Release\net8.0\nmr.exe"
@@ -23,19 +26,21 @@ param(
 $ErrorActionPreference = 'Continue'
 foreach ($p in @($A, $B, $Nmr)) { if (-not (Test-Path $p)) { Write-Error "not found: $p"; exit 2 } }
 if (-not (Test-Path $Work)) { New-Item -ItemType Directory -Force $Work | Out-Null }
-$setArgs = @($Setting -split '\s+' | Where-Object { $_ -ne '' })
+if ($SettingB -eq '') { $SettingB = $Setting }
+$setArgsA = @($Setting -split '\s+' | Where-Object { $_ -ne '' })
+$setArgsB = @($SettingB -split '\s+' | Where-Object { $_ -ne '' })
 
 $wavs = Get-ChildItem "$Corpus\*.wav" | Sort-Object Name
-Write-Host "Setting: $Setting    (meanNMRdb: lower = more transparent; delta<0 => B better)"
+Write-Host "A: $Setting   B: $SettingB   (meanNMRdb: lower = more transparent; delta<0 => B better)"
 Write-Host ("{0,-22} {1,10} {2,10} {3,10}" -f 'file', 'A', 'B', 'delta')
 Write-Host "-----------------------------------------------------------------"
 $sumA = 0.0; $sumB = 0.0; $n = 0
 foreach ($w in $wavs) {
     $vals = @()
-    foreach ($pair in @(@('A', $A), @('B', $B))) {
-        $tag = "$($pair[0])_$($w.BaseName)"; $lame = $pair[1]
+    foreach ($pair in @(@('A', $A, $setArgsA), @('B', $B, $setArgsB))) {
+        $tag = "$($pair[0])_$($w.BaseName)"; $lame = $pair[1]; $sArgs = $pair[2]
         $mp3 = Join-Path $Work "$tag.mp3"; $dec = Join-Path $Work "$tag.wav"
-        & $lame --quiet @setArgs $w.FullName $mp3 2>&1 | Out-Null
+        & $lame --quiet @sArgs $w.FullName $mp3 2>&1 | Out-Null
         & $lame --quiet --decode $mp3 $dec 2>&1 | Out-Null
         $line = (& $Nmr $w.FullName $dec 2>$null | Select-Object -First 1)
         $vals += [double](("$line" -split '\s+')[0])
