@@ -29,3 +29,6 @@ obj/
 
 /tests/regress_corpus/*.wav
 
+/tests/abx/*.wav
+/tests/abx/*.mp3
+
