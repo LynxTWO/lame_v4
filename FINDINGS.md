@@ -101,6 +101,20 @@ industry itself uses.
 - All corpus WAVs are git-ignored (regenerable and/or copyrighted); the generators and the
   committed baseline hashes are what make results reproducible.
 
+### 2e. Measurement pitfalls (each one bit us; check for them in any ad-hoc benchmark)
+
+- **PowerShell automatic variables.** `$a`/`$A` alias each other (case-insensitive), and
+  `$args` is a *reserved* automatic variable — assigning your encode settings to it and then
+  splatting `@args` silently expands to nothing, so every "variant" runs at default settings
+  and all timings/hashes come out identical. This corrupted an entire benchmark round (it
+  briefly convinced us `--quality-max` was cost-neutral and threading was useless). Use
+  distinct names (`$encArgs`, `$mA`/`$mB`).
+- **CPU contention.** Timing runs taken while corpus validations run in the background are
+  garbage. Time on an idle machine, and sanity-check totals against per-stage instrumentation.
+- **A trivially-green gate.** A bit-exact pass with a feature enabled only proves something if
+  the feature actually engaged — pair every parity gate with a measurement (speedup, stage
+  profile) that shows the code path ran.
+
 ---
 
 ## 3. Findings
@@ -239,14 +253,13 @@ guardrail metrics moved the right way (below).
   stock mode 0 (over-count) kept — it won the transient tiebreak (Tom's Diner HF 0.59 vs 0.83)
   and bounding the *count* of distorted bands on short blocks bounds transient smearing.
 - Bit-exact gate: **70/70 green** — every non-`--quality-max` setting byte-identical.
-- Cost: **neutral** — v2 encodes at default `-q0` speed (~113× realtime; Tom's Diner 1.4 s),
-  and ~4.6× *faster* than v1 (6.5 s). We initially reported "~4× slower" from a measurement
-  taken while a corpus validation saturated the machine — a contention artifact, corrected
-  here. The mechanism: v1's worst-case objective drove the Huffman-costed search into an
-  expensive amplification spiral; the aggregate objective avoids it, fixing the slowdown as a
-  side effect of fixing quality. Profiling fallout: encode time at *every* effort level
-  (`-q9` → `--quality-max`) is ~identical — the analysis front (filterbank/MDCT/psymodel)
-  dominates, quantization is nearly free. That reshapes where any future speed work must aim.
+- Cost: **~15× default `-q0`** (Tom's Diner CBR128: 22.3 s vs 1.5 s; CBR320 39.9 s;
+  ABR192 29.8 s) — still faster than realtime single-threaded, and cut substantially by
+  `--threads 2` (Finding 4). *Correction history, kept for honesty:* we briefly "corrected"
+  this to cost-neutral based on a benchmark where the encode settings were assigned to
+  PowerShell's reserved `$args` automatic variable — the splat silently expanded to nothing
+  and every measurement ran at default settings. Stage-level instrumentation (below) settled
+  it: the original ~22 s figure was right. See "Measurement pitfalls" in §2.
 
 **Result (final `--quality-max` v2 vs v1, corpus mean):** CBR128 **−0.944 dB**; CBR320
 **−0.982 dB**; ABR192 **−0.761 dB**.
@@ -263,13 +276,20 @@ budget, a minimax search pours bits into the hardest band until *something else*
 worst, round-robining precision away from the whole spectrum. The aggregate objective spends
 each bit where it buys the largest total audibility reduction — which is what a listener hears.
 
-### Finding 4: bit-exact channel-parallel quantization — built, proven, and honestly shelved
+### Finding 4: bit-exact channel-parallel quantization (`--threads 2`)
 
-**Layman:** we made LAME able to use two CPU cores on one file — with the *guarantee* that the
-output is byte-for-byte identical to single-threaded (this trades cores for wall time only,
-never quality). Then honest measurement showed it doesn't help *yet*: at today's settings the
-part we parallelized is nearly free. It ships off-by-default as the foundation for when a
-future, deeper search makes that part expensive again.
+**Layman:** LAME can now use two CPU cores on one file — with the *guarantee* that the output
+is byte-for-byte identical to single-threaded (this trades cores for wall time only, never
+quality). On the maximum-effort mode it cuts encode time by up to a third.
+
+**Measured (real music, Tom's Diner, 1 → 2 threads):** `--quality-max` CBR320 39.9 → 25.9 s
+(**1.54×**), ABR192 29.8 → 19.8 s (**1.50×**), CBR128 22.3 → 19.0 s (1.17× — joint stereo
+gives the mid channel most of the search work at low bitrates, and the per-granule join waits
+for the slower channel), default `-q0` 1.5 → 1.4 s (1.06× — quantization is a smaller share
+there). *An earlier version of this finding reported "no benefit" and shelved the feature —
+that benchmark was corrupted by the PowerShell `$args` pitfall (see §2, Measurement pitfalls)
+and compared default-settings encodes against each other. The bit-exactness results were never
+affected (the gate passes its arguments correctly).*
 
 **Engineer:** `--threads 2` / `lame_set_threads`. The per-(granule,channel) quantization body
 was extracted verbatim into `quantize_gr_ch` (refactor alone re-verified 70/70 bit-exact);
@@ -288,13 +308,20 @@ Eligibility (worker created at all): stereo, CBR/ABR, substep off; anything else
 untouched sequential path. **Verified: the 70-case gate passes both with `--threads 2` and
 without, against the same baseline.**
 
-**Why shelved:** profiling on real music shows encode time is ~identical at *every* effort
-level (`-q9` 1.45 s, `-q0` 1.39 s, `--quality-max` 1.39 s on a 157 s track) — the analysis
-front (filterbank/MDCT/psymodel) dominates; quantization is ~3% of runtime, so parallelizing
-it wins nothing today (measured 0.94×: pure dispatch overhead). It becomes valuable exactly
-when a deeper noise-allocation search (quality-max v3, e.g. trellis) makes quantization
-dominant. Any future *analysis-side* threading needs its own shared-state audit (the psymodel
-couples channels through mid/side and loudness).
+**Where the time actually goes** (stage instrumentation, Tom's Diner):
+
+| Setting | psymodel | MDCT | quantization | bitstream |
+| --- | --- | --- | --- | --- |
+| default `-q0` CBR128 | 26% | 13% | **58%** | 3% |
+| `--quality-max` CBR128 | 2% | 1% | **97%** | 0% |
+| `-V 2` | 24% | 11% | **61%** | 4% |
+
+Quantization dominates everywhere, so channel-parallelizing it was the right first lever.
+Remaining headroom: (a) the CBR128 imbalance — a schedule that overlaps across granules would
+help, but CBR's granule-1 bit targets depend on granule 0's reservoir accounting, so only ABR
+(targets precomputed per frame) could pipeline per-channel chains; (b) the analysis front
+(~39% at default settings) — parallelizing psymodel/MDCT needs its own shared-state audit
+(the psymodel couples channels through mid/side spectra and loudness).
 
 ### Finding 0 (minor): re-enabling the in-loop Huffman search (`best_huffman = 2`)
 
@@ -376,9 +403,9 @@ result to `output/lame_fix.exe`, `git checkout master && build.cmd`, copy to
       format. Integral values take the legacy integer arithmetic verbatim (bit-identical);
       fractional ones refine the per-frame target in `calc_target_bits`. Measured: sizes
       strictly monotone through 191 → 191.25 → 191.5 → 191.75 → 192.
-- [x] **Finding 4: bit-exact channel-parallel quantization** (`--threads 2`) — built, gate
-      passes 70/70 with threads on AND off; honestly shelved (quantization is ~3% of runtime;
-      the analysis front dominates at every effort level). Foundation for quality-max v3.
+- [x] **Finding 4: bit-exact channel-parallel quantization** (`--threads 2`) — gate passes
+      70/70 with threads on AND off; **1.54× on `--quality-max` CBR320, 1.50× ABR192** (real
+      benchmark after fixing the `$args` pitfall; quantization is 58–97% of encode time).
 - [x] **CMake build** (`CMakeLists.txt`) mirroring the canonical Makefile.MSVC Win64 flags —
       verified **bit-identical to the nmake baseline (70/70)** on MSVC; portable gcc/clang
       path (strict IEEE, no fast-math) for other platforms.

@@ -512,9 +512,9 @@ lame_init_qval(lame_global_flags * gfp)
            aggregate objective set for quality_max after the cfg copies in lame_init_params
            (quant_comp=2 for CBR/ABR; deep+aggregate beat aggregate-alone by -0.13 dB there).
            For VBR this matches the stock q0 config (already full_outer_loop=1), so it is a
-           no-op. Encode cost measured NEUTRAL vs default -q0 (the aggregate objective avoids
-           the expensive amplification spiral the worst-case objective provoked, which also
-           made this mode ~4x faster than quality-max v1). */
+           no-op. Cost: ~15x default -q0 at CBR128 (quantization becomes ~97% of encode time);
+           --quality-max exists to spend that, and --threads 2 recovers up to a third of it
+           bit-exactly. */
         cfg->full_outer_loop = 1;
     }
 }
