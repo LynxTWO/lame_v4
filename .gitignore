@@ -19,9 +19,12 @@ CMakeFiles/
 *.la
 .deps/
 .libs/
-# Regression / corpus scratch (large, regenerable)
-/tests/corpus/*.wav
+# Regression / corpus scratch (large, regenerable, and/or copyrighted - SQAM, user tracks).
+# The ** matters: corpus subfolders (SQAM/) hold copyrighted EBU material that must never land
+# in the repo.
+/tests/corpus/**/*.wav
 /tests/out/
+/tests/out*/
 
 # .NET build output (corpusgen, future tools)
 bin/
