@@ -52,7 +52,7 @@ static class Program
 
         Console.WriteLine("time(s)   preEcho_A  preEcho_B   (lower=cleaner)    HF_orig  HF_A   HF_B   (dB rel)");
         int preSamps = (int)(0.015 * SR); // 15 ms pre-window
-        double sumPreA = 0, sumPreB = 0; int n = 0;
+        double sumPreA = 0, sumPreB = 0; double sumHfErrA = 0, sumHfErrB = 0; int n = 0;
         int shown = 0;
         foreach (var (p, _) in ranked)
         {
@@ -62,7 +62,8 @@ static class Program
             double hfO = HfEnergyDb(o, p);
             double hfA = HfEnergyDb(a, p + oa);
             double hfB = HfEnergyDb(b, p + ob);
-            sumPreA += preA; sumPreB += preB; n++;
+            sumPreA += preA; sumPreB += preB;
+            sumHfErrA += Math.Abs(hfA - hfO); sumHfErrB += Math.Abs(hfB - hfO); n++;
             Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
                 "{0,7:F3}   {1,9:F2}  {2,9:F2}                      {3,6:F1}  {4,5:F1}  {5,5:F1}",
                 (double)p / SR, preA, preB, hfO, hfA - hfO, hfB - hfO));
@@ -70,9 +71,14 @@ static class Program
         }
         Console.WriteLine("----");
         Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
-            "MEAN pre-echo (dB): A={0:F2}  B={1:F2}   -> {2}",
+            "MEAN pre-echo (dB):     A={0:F2}  B={1:F2}   -> {2}",
             sumPreA / Math.Max(1, n), sumPreB / Math.Max(1, n),
-            (sumPreB < sumPreA) ? "B has LESS pre-echo (cleaner transients)" : "A has less pre-echo"));
+            (sumPreB < sumPreA) ? "B cleaner (less pre-echo)" : "A cleaner (less pre-echo)"));
+        // HF fidelity = mean |HF - HF_orig| at transients (lower = closer to original HF detail).
+        Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
+            "MEAN HF error (dB):     A={0:F2}  B={1:F2}   -> {2}",
+            sumHfErrA / Math.Max(1, n), sumHfErrB / Math.Max(1, n),
+            (sumHfErrB < sumHfErrA) ? "B closer to original HF (crisper transients)" : "A closer to original HF"));
         return 0;
     }
 

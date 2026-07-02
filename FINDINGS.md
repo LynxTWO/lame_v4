@@ -244,8 +244,14 @@ result to `output/lame_fix.exe`, `git checkout master && build.cmd`, copy to
 - [x] **Finding 2: `--quality-max` mode v1** (fix + in-loop Huffman) — merged to master, 70/70
       bit-exact, measured −0.36 to −0.75 dB at CBR/ABR.
 - [ ] Owner go/no-go: merge the default-`-q0` fix (`qa/fix-noiseshaping-cbr`) to master.
-- [ ] `--quality-max` v2: the deeper noise-allocation search (trellis/exhaustive) — the big
-      flagship lever, gated on `cfg->quality_max`.
+- [~] `--quality-max` v2 (in progress): the deeper noise-allocation search, gated on
+      `cfg->quality_max`. **Target defined by an ABX follow-up:** the shipped fix trades a little
+      transient HF-crispness for cleaner texture (the owner heard this and preferred the texture;
+      `tests/transient` measures it). `--quality-max` v1 already recovers transient HF *somewhat*
+      (mean error 1.16 vs default 1.49 dB on the ABX clip; 3/5 tracks better) via Huffman bit
+      savings, but inconsistently. v2 lever: protect HF scalefactor bands in short-block
+      (transient) frames under quality_max, gated by the `tests/transient` HF metric (want
+      consistently lower HF error) without raising pre-echo or overall meanNMRdb.
 - [ ] Podcast constrained-optimizer (design in `docs/podcast-optimizer-design.md`): ABR-centered
       parallel legal-candidate search; 192 kbps stereo / 96 kbps mono; never cap frames w/ `-B`.
 - [ ] Multithreading (bit-exact) to *fund* the expensive search; AVX2 SIMD on the scalar hot
