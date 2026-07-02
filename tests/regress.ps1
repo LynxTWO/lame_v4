@@ -15,7 +15,9 @@
 param(
     [switch]$UpdateBaseline,
     [string]$Lame   = "$PSScriptRoot\..\output\lame.exe",
-    [string]$Corpus = "$PSScriptRoot\corpus",
+    # Bit-exact gate uses the deterministic synthetic set only (fast, committed baseline).
+    # Real/user tracks live in corpus/ and are used by abtest.ps1 for QUALITY, not here.
+    [string]$Corpus = "$PSScriptRoot\regress_corpus",
     [string]$Work   = "$PSScriptRoot\out",
     [string]$BaselineFile = "$PSScriptRoot\baseline.json"
 )

@@ -27,3 +27,5 @@ CMakeFiles/
 bin/
 obj/
 
+/tests/regress_corpus/*.wav
+
