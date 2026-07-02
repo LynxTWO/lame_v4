@@ -756,7 +756,9 @@ long_help(const lame_global_flags * gfp, FILE * const fp, const char *ProgramNam
             "                    -q 0:  Highest quality, very slow \n"
             "                    -q 9:  Poor quality, but fast \n"
             "    -h              Same as -q 2.   \n"
-            "    -f              Same as -q 7.   Fast, ok quality\n");
+            "    -f              Same as -q 7.   Fast, ok quality\n"
+            "    --quality-max   maximum-effort search, beyond -q 0 (much slower;\n"
+            "                    best quality; alias --qmax)\n");
 
     wait_for(fp, lessmode);
     fprintf(fp,
