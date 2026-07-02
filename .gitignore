@@ -1,0 +1,24 @@
+# Build outputs
+output/
+*.obj
+*.exe
+*.dll
+*.lib
+*.exp
+*.pdb
+*.idb
+*.res
+*.ilk
+*.manifest
+# CMake / autotools scratch
+build/
+CMakeCache.txt
+CMakeFiles/
+*.o
+*.lo
+*.la
+.deps/
+.libs/
+# Regression / corpus scratch (large, regenerable)
+/tests/corpus/*.wav
+/tests/out/
