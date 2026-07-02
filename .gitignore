@@ -22,3 +22,8 @@ CMakeFiles/
 # Regression / corpus scratch (large, regenerable)
 /tests/corpus/*.wav
 /tests/out/
+
+# .NET build output (corpusgen, future tools)
+bin/
+obj/
+
