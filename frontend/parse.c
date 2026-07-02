@@ -1587,6 +1587,11 @@ parse_args_(lame_global_flags * gfp, int argc, char **argv,
                         lame_set_VBR_mean_bitrate_kbps(gfp, int_value);
                     }
 
+                T_ELIF2("quality-max", "qmax")
+                    /* v4: maximum-effort quality mode. Opt-in; spends extra CPU searching
+                       legal MP3 encodings for higher quality. Does not change other settings. */
+                    (void) lame_set_quality_max(gfp, 1);
+
                 T_ELIF("r3mix")
                     lame_set_preset(gfp, R3MIX);
 

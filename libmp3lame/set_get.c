@@ -372,6 +372,28 @@ lame_get_quality(const lame_global_flags * gfp)
     return 0;
 }
 
+/* v4: maximum-effort ("quality max") mode. Builds on q0 with the in-loop Huffman search and
+   the coarse-then-fine CBR/ABR noise shaping, and enables the deeper noise-allocation search.
+   Opt-in only; does not change any existing quality/VBR setting. */
+int
+lame_set_quality_max(lame_global_flags * gfp, int mode)
+{
+    if (is_lame_global_flags_valid(gfp)) {
+        gfp->quality_max = mode ? 1 : 0;
+        return 0;
+    }
+    return -1;
+}
+
+int
+lame_get_quality_max(const lame_global_flags * gfp)
+{
+    if (is_lame_global_flags_valid(gfp)) {
+        return gfp->quality_max;
+    }
+    return 0;
+}
+
 
 /* mode = STEREO, JOINT_STEREO, DUAL_CHANNEL (not supported), MONO */
 int

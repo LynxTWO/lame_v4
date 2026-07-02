@@ -367,7 +367,10 @@ lame_init_qval(lame_global_flags * gfp)
     lame_internal_flags *const gfc = gfp->internal_flags;
     SessionConfig_t *const cfg = &gfc->cfg;
 
-    switch (gfp->quality) {
+    /* v4 maximum-effort mode uses the q0 config as its base, then adds extra search below. */
+    int const q = gfp->quality_max ? 0 : gfp->quality;
+
+    switch (q) {
     default:
     case 9:            /* no psymodel, no noise shaping */
         cfg->noise_shaping = 0;
@@ -476,6 +479,25 @@ lame_init_qval(lame_global_flags * gfp)
         break;
     }
 
+    /* v4 maximum-effort mode ("--quality-max"): starts from the q0 config above, then adds
+       more search. Runs after the per-quality switch (and after the gfp->cfg copies), so these
+       assignments win. Opt-in only -- untouched when quality_max is 0. */
+    cfg->quality_max = gfp->quality_max;
+    if (gfp->quality_max) {
+        /* (1) the thorough in-loop Huffman search q0 disables for speed (best cost model). */
+        cfg->use_best_huffman = 2;
+        /* (2) for bit-constrained modes, the coarse-then-fine noise shaping -- which also
+           fixes the 3.100 CBR/ABR regression where q0's VBR-tuned amp=2 + substep shaping
+           misbehave when the outer loop stops early on a fixed bit budget. VBR keeps q0's
+           amp=2 + full outer loop. */
+        if (cfg->vbr == vbr_off || cfg->vbr == vbr_abr) {
+            cfg->noise_shaping_amp = 3;
+            cfg->full_outer_loop = 0;
+            gfc->sv_qnt.substep_shaping = 0;
+        }
+        /* (3) the deeper noise-allocation search is enabled via cfg->quality_max and read in
+           quantize.c (outer_loop). */
+    }
 }
 
 

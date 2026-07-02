@@ -263,6 +263,11 @@ int CDECL lame_get_ogg(const lame_global_flags *);
 int CDECL lame_set_quality(lame_global_flags *, int);
 int CDECL lame_get_quality(const lame_global_flags *);
 
+/* v4 maximum-effort mode ("--quality-max"): opt-in, spends more CPU searching legal MP3
+ * encodings for higher quality. 1 = on, 0 = off (default). Does not alter any other setting. */
+int CDECL lame_set_quality_max(lame_global_flags *, int);
+int CDECL lame_get_quality_max(const lame_global_flags *);
+
 /*
   mode = 0,1,2,3 = stereo, jstereo, dual channel (not supported), mono
   default: lame picks based on compression ration and input channels

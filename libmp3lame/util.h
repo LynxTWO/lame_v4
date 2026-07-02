@@ -380,6 +380,7 @@ extern  "C" {
 
 
         int     full_outer_loop; /* 0 = stop early after 0 distortion found. 1 = full search */
+        int     quality_max;     /* v4: 1 = maximum-effort mode (deeper search than q0) */
 
         int     lowpassfreq;
         int     highpassfreq;
