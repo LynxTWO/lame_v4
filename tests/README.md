@@ -26,8 +26,31 @@ pwsh tests\regress.ps1                     # compare a later build; exit 1 on an
   The pristine 3.100 baseline is 70 cases and is the reference every bit-exact change must
   reproduce.
 
+## Perceptual noise-to-mask meter (`nmr/`) + A/B harness (`abtest.ps1`)
+
+Judges **quality**, encoder-independently. `nmr` (a net8 tool) takes an original WAV and a
+decoded WAV and measures how much coding noise sits **above** a masking threshold it derives
+itself (critical-band energy + spreading + absolute threshold) — deliberately not LAME's own
+model, so improving LAME cannot trivially game the score. Primary output is `meanNMRdb`
+(lower = more transparent). Validated: it is monotone with bitrate (128k -3.5 → 320k -15.3 dB
+on `music_mix`).
+
+`abtest.ps1` encodes the whole corpus with two `lame.exe` builds (A = reference, B = variant)
+at one setting, decodes both, and reports per-file and corpus-mean `meanNMRdb` plus delta.
+**delta < 0 means B is more transparent than A at the same bitrate — a real quality win.**
+
+```
+dotnet build tests\nmr -c Release
+pwsh tests\abtest.ps1 -A output\lame.exe -B ..\variant\output\lame.exe -Setting '-V0'
+pwsh tests\abtest.ps1 -Setting '-b192'    # A=B self-check -> 0.000 delta everywhere
+```
+
+This is the day-to-day gate for the deep-search flagship (Q-A): a change that lands must show
+a negative corpus-mean delta at equal bitrate, and (for behavior-preserving changes) keep
+`regress.ps1` green.
+
 ## Rule
 
 If a commit is supposed to preserve output, `regress.ps1` must stay green. If it changes
-output on purpose (a quality improvement), that must be stated in the commit and backed by
-the perceptual-metric harness — not hand-waved.
+output on purpose (a quality improvement), it must show a negative `abtest.ps1` delta at equal
+bitrate — measured, not hand-waved — and ultimately survive human ABX before shipping default-on.
