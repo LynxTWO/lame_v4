@@ -12,6 +12,8 @@ output/
 *.manifest
 # CMake / autotools scratch
 build/
+build-*/
+ci_baseline.json
 CMakeCache.txt
 CMakeFiles/
 *.o

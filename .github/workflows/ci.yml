@@ -1,0 +1,87 @@
+# LAME v4 CI.
+#
+# Philosophy (matches FINDINGS.md): behavior-preserving changes must be BIT-EXACT. Hashes are
+# per-toolchain, so the enforced Windows gates compare artifacts built by THIS runner against
+# each other (build-system parity, threading parity); the comparison against the committed
+# dev-machine baseline is informational -- it fails only when the runner's MSVC codegen drifts
+# from the dev machine's, which is worth knowing but is not a code regression.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  windows-bitexact:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Generate deterministic regression corpus
+        run: dotnet run --project tests/corpusgen -- tests/regress_corpus
+
+      - name: Build (nmake, canonical)
+        run: cmd /c 'nmake -f Makefile.MSVC MSVCVER=Win64 ASM=NO "MACHINE=/machine:x64"'
+      - name: Keep nmake binary
+        run: Copy-Item output\lame.exe output\lame_nmake.exe
+
+      - name: Build (CMake + Ninja)
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+
+      - name: Runner baseline from nmake build
+        run: pwsh tests/regress.ps1 -Lame output\lame_nmake.exe -UpdateBaseline -BaselineFile ci_baseline.json
+
+      - name: "GATE: CMake build is bit-identical to nmake build"
+        run: pwsh tests/regress.ps1 -Lame build\lame.exe -BaselineFile ci_baseline.json
+
+      - name: "GATE: --threads 2 is bit-identical to single-threaded"
+        run: pwsh tests/regress.ps1 -Lame output\lame_nmake.exe -BaselineFile ci_baseline.json -ExtraArgs '--threads 2'
+
+      - name: "INFO: runner toolchain vs committed dev baseline (drift detector)"
+        continue-on-error: true
+        run: pwsh tests/regress.ps1 -Lame output\lame_nmake.exe
+
+  linux-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Generate deterministic regression corpus
+        run: dotnet run --project tests/corpusgen -- tests/regress_corpus
+      - name: Build (CMake, gcc)
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j
+      - name: "Smoke: all settings encode+decode + perceptual sanity"
+        run: bash tests/smoke.sh build/lame
+
+  fuzz-decoder:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build with libFuzzer + ASan (clang)
+        run: |
+          cmake -B build-fuzz -DLAME_FUZZ=ON -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-fuzz -j
+      - name: Seed corpus from the freshly built encoder
+        run: |
+          dotnet run --project tests/corpusgen -- tests/regress_corpus
+          mkdir -p seeds
+          ./build-fuzz/lame --quiet -b 128 tests/regress_corpus/impulse_train.wav seeds/cbr128.mp3
+          ./build-fuzz/lame --quiet -V 5 tests/regress_corpus/log_sweep.wav seeds/v5.mp3
+          ./build-fuzz/lame --quiet --abr 64 -m m tests/regress_corpus/castanet_bursts.wav seeds/abr64m.mp3
+      - name: Fuzz hip_decode (60 s)
+        run: ./build-fuzz/fuzz_hip_decode seeds -max_total_time=60 -print_final_stats=1

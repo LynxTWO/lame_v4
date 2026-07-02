@@ -8,9 +8,16 @@ REM header (e.g. util.h, lame_global_flags.h), run a CLEAN build or you get stal
 REM mismatched struct layouts -> silent memory corruption (encode ok, crash on exit):
 REM     build.cmd clean  &&  build.cmd
 setlocal
-set VCVARS=C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat
+REM Locate vcvars64.bat: vswhere (any VS edition, incl. CI runners) first, then the
+REM Build Tools default path this machine uses.
+set VCVARS=
+set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+if exist "%VSWHERE%" (
+  for /f "usebackq delims=" %%i in (`"%VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -find VC\Auxiliary\Build\vcvars64.bat`) do set "VCVARS=%%i"
+)
+if not defined VCVARS set VCVARS=C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat
 if not exist "%VCVARS%" (
-  echo ERROR: vcvars64.bat not found at "%VCVARS%"
+  echo ERROR: vcvars64.bat not found ^(vswhere and default Build Tools path both failed^)
   exit /b 1
 )
 call "%VCVARS%" >nul 2>&1

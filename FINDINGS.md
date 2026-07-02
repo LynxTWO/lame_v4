@@ -379,9 +379,19 @@ result to `output/lame_fix.exe`, `git checkout master && build.cmd`, copy to
 - [x] **Finding 4: bit-exact channel-parallel quantization** (`--threads 2`) — built, gate
       passes 70/70 with threads on AND off; honestly shelved (quantization is ~3% of runtime;
       the analysis front dominates at every effort level). Foundation for quality-max v3.
-- [ ] Modern-century track, re-aimed by the Finding 4 profile: CMake + CI, fuzz the mpglib
-      decoder, and (for speed) an analysis-front audit — psymodel/MDCT is where the time is;
-      its channel coupling (mid/side, loudness) needs its own shared-state audit first.
+- [x] **CMake build** (`CMakeLists.txt`) mirroring the canonical Makefile.MSVC Win64 flags —
+      verified **bit-identical to the nmake baseline (70/70)** on MSVC; portable gcc/clang
+      path (strict IEEE, no fast-math) for other platforms.
+- [x] **CI** (`.github/workflows/ci.yml`): Windows job enforces build-system parity
+      (nmake ≡ CMake) and threading parity (`--threads 2` ≡ sequential) against a
+      runner-built baseline, with the committed dev baseline as an informational toolchain
+      drift detector; Linux job builds with gcc and runs `tests/smoke.sh` (every reference
+      setting encodes+decodes + perceptual self-check + bitrate monotonicity); fuzz job runs
+      the mpglib/hip decoder under libFuzzer+ASan for 60 s per push. Inert until the repo has
+      a GitHub remote.
+- [ ] Longer fuzz campaign locally / oss-fuzz-style once the harness proves itself in CI.
+- [ ] Analysis-front (psymodel/MDCT) parallelism audit — that's where encode time is; its
+      channel coupling (mid/side, loudness) needs its own shared-state audit first.
 
 ---
 
