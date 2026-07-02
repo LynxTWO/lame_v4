@@ -152,9 +152,39 @@ On SQAM the worst per-file regression is +0.10 dB (inaudible); the biggest singl
 output is byte-identical to pristine 3.100. The change is surgically confined to the path it
 targets, and it only improves it.
 
-**Status:** validated three independent ways; awaiting the owner's decision to ship it to
-default `-q0` and/or fold it into a `--quality max` mode, ideally after a quick human ABX on
-one track (binaries ready: `output/lame_base.exe` = stock, `output/lame_fix.exe` = fixed).
+**Human ABX confirmation (2026-07-02):** the project owner ran a blind ABX in foobar2000 v2.25
+(foo_abx 2.2.3) on the Tom's Diner clip, stock-`q0` vs fixed-`q0` at CBR 128:
+**15/16 correct, p = 0.0003.** The two are *reliably audibly distinguishable* (odds of that by
+guessing ≈ 0.03%). ABX proves difference, not preference per se — but the objective evidence
+(fixed measures −0.55 dB more transparent with fewer audible bands here; 59/70 SQAM files
+better) identifies the fixed encode as the cleaner one. Objective meter + professional test set
++ human ear now all agree.
+
+**Status:** validated four ways (perceptual meter, SQAM, byte-isolation, human ABX). The
+opt-in path shipped via `--quality-max` (Finding 2, merged to master). The **default-`q0`**
+change lives on branch `qa/fix-noiseshaping-cbr`, ready to merge on the owner's go — it fixes a
+genuine regression, is byte-isolated, leaves VBR untouched, and is now ABX-confirmed audible.
+
+### Finding 2: `--quality-max` — an opt-in maximum-effort mode (merged to master)
+
+**Layman:** a new switch, `--quality-max`, that tells LAME to work *much* harder for quality —
+worth it on modern multi-core machines. It never changes any existing setting; it only does
+more when you ask.
+
+**Engineer:** new dedicated flag (`--quality-max` / `--qmax`; API `lame_set_quality_max`,
+config `cfg->quality_max`). Builds on the `-q0` config with (1) the in-loop Huffman search q0
+disables for speed and (2) for CBR/ABR the coarse-then-fine `amp=3` shaping from Finding 1
+(VBR unchanged). A deeper noise-allocation search is wired (`cfg->quality_max`) but not yet
+implemented — that's the next flagship increment. **Measured vs stock `-q0` (meanNMRdb, lower =
+better): CBR128 −0.357, CBR320 −0.753, ABR192 −0.605; V0 0.000** (best_huffman helps VBR as
+smaller files at equal quality, which an equal-setting NMR test doesn't capture). **Purely
+additive: the bit-exact gate is 70/70 green** — every existing setting is byte-identical to
+pristine 3.100.
+
+**Build gotcha (important):** `Makefile.MSVC` does not track header dependencies. After editing
+a widely-included header (`util.h`, `lame_global_flags.h`), you MUST `nmake -f Makefile.MSVC
+clean` before rebuilding, or stale objects with the old struct layout cause silent memory
+corruption (encode succeeds, then crashes on exit). `build.cmd clean && build.cmd` does it.
 
 ### Finding 0 (minor): re-enabling the in-loop Huffman search (`best_huffman = 2`)
 
@@ -210,12 +240,14 @@ result to `output/lame_fix.exe`, `git checkout master && build.cmd`, copy to
 
 - [x] Measurement foundation (bit-exact gate, perceptual meter, A/B harness) — built + validated.
 - [x] Three-way test corpora incl. real music and EBU SQAM.
-- [x] **Finding 1: CBR/ABR `-q0` regression — confirmed and fixed**, validated on SQAM.
-- [ ] Owner decision: ship the fix to default `-q0` vs gate under `--quality max` (ABX first).
-- [ ] `--quality max` mode: dedicated flag folding in the fix + best_huffman=2 + a deeper
-      noise-allocation search (the big flagship lever).
-- [ ] Podcast constrained-optimizer modes (ABR-centered, parallel legal-candidate search;
-      192 kbps stereo / 96 kbps mono; never cap frames with `-B`).
+- [x] **Finding 1: CBR/ABR `-q0` regression — confirmed, fixed, ABX-validated (15/16, p=0.0003).**
+- [x] **Finding 2: `--quality-max` mode v1** (fix + in-loop Huffman) — merged to master, 70/70
+      bit-exact, measured −0.36 to −0.75 dB at CBR/ABR.
+- [ ] Owner go/no-go: merge the default-`-q0` fix (`qa/fix-noiseshaping-cbr`) to master.
+- [ ] `--quality-max` v2: the deeper noise-allocation search (trellis/exhaustive) — the big
+      flagship lever, gated on `cfg->quality_max`.
+- [ ] Podcast constrained-optimizer (design in `docs/podcast-optimizer-design.md`): ABR-centered
+      parallel legal-candidate search; 192 kbps stereo / 96 kbps mono; never cap frames w/ `-B`.
 - [ ] Multithreading (bit-exact) to *fund* the expensive search; AVX2 SIMD on the scalar hot
       loops; modern CMake/CI; fuzz the decoder.
 
