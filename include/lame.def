@@ -299,3 +299,8 @@ id3tag_set_fieldvalue_ucs2	@2023
 id3tag_set_comment_utf16	@2024
 id3tag_set_textinfo_utf16 @2025
 id3tag_set_fieldvalue_utf16	@2026
+; v4 additions
+lame_set_quality_max	@2027
+lame_get_quality_max	@2028
+lame_set_VBR_mean_bitrate_float	@2029
+lame_get_VBR_mean_bitrate_float	@2030

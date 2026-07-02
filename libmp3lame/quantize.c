@@ -1784,12 +1784,28 @@ calc_target_bits(lame_internal_flags * gfc,
     mean_bits = getframebits(gfc) - cfg->sideinfo_len * 8;
     *analog_silence_bits = mean_bits / (cfg->mode_gr * cfg->channels_out);
 
-    mean_bits = cfg->vbr_avg_bitrate_kbps * framesize * 1000;
-    if (gfc->sv_qnt.substep_shaping & 1)
-        mean_bits *= 1.09;
-    mean_bits /= cfg->samplerate_out;
-    mean_bits -= cfg->sideinfo_len * 8;
-    mean_bits /= (cfg->mode_gr * cfg->channels_out);
+    /* v4 fractional ABR: when a non-integral float target is set, compute the per-granule
+       budget in double and truncate once at the end. Gated so integral (and unset) targets
+       take the original integer arithmetic verbatim -- bit-identical legacy behavior, enforced
+       by the regression gate. */
+    if (cfg->vbr_avg_bitrate_float > 0
+        && cfg->vbr_avg_bitrate_float != (FLOAT) cfg->vbr_avg_bitrate_kbps) {
+        double  mb = (double) cfg->vbr_avg_bitrate_float * framesize * 1000.0;
+        if (gfc->sv_qnt.substep_shaping & 1)
+            mb *= 1.09;
+        mb /= cfg->samplerate_out;
+        mb -= cfg->sideinfo_len * 8;
+        mb /= (cfg->mode_gr * cfg->channels_out);
+        mean_bits = (int) mb;
+    }
+    else {
+        mean_bits = cfg->vbr_avg_bitrate_kbps * framesize * 1000;
+        if (gfc->sv_qnt.substep_shaping & 1)
+            mean_bits *= 1.09;
+        mean_bits /= cfg->samplerate_out;
+        mean_bits -= cfg->sideinfo_len * 8;
+        mean_bits /= (cfg->mode_gr * cfg->channels_out);
+    }
 
     /*
        res_factor is the percentage of the target bitrate that should

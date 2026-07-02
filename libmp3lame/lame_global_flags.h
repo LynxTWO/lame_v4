@@ -105,6 +105,8 @@ struct lame_global_struct {
     float   VBR_q_frac;      /* Range [0,...,1[ */
     int     VBR_q;           /* Range [0,...,9] */
     int     VBR_mean_bitrate_kbps;
+    float   VBR_mean_bitrate_abr_float; /* v4: fractional ABR target in kbps; 0 = unset, use
+                                           the integer field (bit-identical legacy path) */
     int     VBR_min_bitrate_kbps;
     int     VBR_max_bitrate_kbps;
     int     VBR_hard_min;    /* strictly enforce VBR_min_bitrate

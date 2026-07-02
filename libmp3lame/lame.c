@@ -1162,6 +1162,15 @@ lame_init_params(lame_global_flags * gfp)
     cfg->use_best_huffman = gfp->use_best_huffman;
     cfg->avg_bitrate = gfp->brate;
     cfg->vbr_avg_bitrate_kbps = gfp->VBR_mean_bitrate_kbps;
+    /* v4 fractional ABR: clamp the float target to the same table bounds the integer field
+       got above; a zero/integral value keeps the legacy integer path bit-identical. */
+    cfg->vbr_avg_bitrate_float = gfp->VBR_mean_bitrate_abr_float;
+    if (cfg->vbr_avg_bitrate_float > 0) {
+        FLOAT const lo = bitrate_table[cfg->version][cfg->vbr_min_bitrate_index];
+        FLOAT const hi = bitrate_table[cfg->version][cfg->vbr_max_bitrate_index];
+        if (cfg->vbr_avg_bitrate_float < lo) cfg->vbr_avg_bitrate_float = lo;
+        if (cfg->vbr_avg_bitrate_float > hi) cfg->vbr_avg_bitrate_float = hi;
+    }
     cfg->compression_ratio = gfp->compression_ratio;
 
     /* initialize internal qval settings */

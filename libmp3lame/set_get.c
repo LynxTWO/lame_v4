@@ -1233,6 +1233,33 @@ lame_get_VBR_mean_bitrate_kbps(const lame_global_flags * gfp)
     return 0;
 }
 
+/* v4: fractional ABR target. MP3's average bitrate is achieved by mixing discrete frame
+   sizes, so any fractional mean is physically reachable -- the integer-only API was history,
+   not format. Also sets the integer field (rounded) so presets, clamps and the info tag keep
+   behaving; the fractional value only refines the per-frame bit target (calc_target_bits).
+   An integral or zero value leaves the legacy integer path bit-identical. */
+int
+lame_set_VBR_mean_bitrate_float(lame_global_flags * gfp, float VBR_mean_bitrate_kbps)
+{
+    if (is_lame_global_flags_valid(gfp)) {
+        gfp->VBR_mean_bitrate_abr_float = VBR_mean_bitrate_kbps;
+        gfp->VBR_mean_bitrate_kbps = (int) (VBR_mean_bitrate_kbps + 0.5f);
+        return 0;
+    }
+    return -1;
+}
+
+float
+lame_get_VBR_mean_bitrate_float(const lame_global_flags * gfp)
+{
+    if (is_lame_global_flags_valid(gfp)) {
+        return gfp->VBR_mean_bitrate_abr_float > 0
+            ? gfp->VBR_mean_bitrate_abr_float
+            : (float) gfp->VBR_mean_bitrate_kbps;
+    }
+    return 0;
+}
+
 int
 lame_set_VBR_min_bitrate_kbps(lame_global_flags * gfp, int VBR_min_bitrate_kbps)
 {

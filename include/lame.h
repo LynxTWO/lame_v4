@@ -449,6 +449,12 @@ float CDECL lame_get_VBR_quality(const lame_global_flags *);
 int CDECL lame_set_VBR_mean_bitrate_kbps(lame_global_flags *, int);
 int CDECL lame_get_VBR_mean_bitrate_kbps(const lame_global_flags *);
 
+/* v4: fractional ABR target in kbps (e.g. 191.5). The average bitrate of an MP3 is a mix of
+   discrete frame sizes, so fractional means are physically reachable; integral values behave
+   exactly like lame_set_VBR_mean_bitrate_kbps. Ignored except for VBR=vbr_abr. */
+int CDECL lame_set_VBR_mean_bitrate_float(lame_global_flags *, float);
+float CDECL lame_get_VBR_mean_bitrate_float(const lame_global_flags *);
+
 int CDECL lame_set_VBR_min_bitrate_kbps(lame_global_flags *, int);
 int CDECL lame_get_VBR_min_bitrate_kbps(const lame_global_flags *);
 

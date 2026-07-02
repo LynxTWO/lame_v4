@@ -401,6 +401,7 @@ extern  "C" {
 
         vbr_mode vbr;
         int     vbr_avg_bitrate_kbps;
+        FLOAT   vbr_avg_bitrate_float; /* v4: fractional ABR target; 0 = use the integer field */
         int     vbr_min_bitrate_index; /* min bitrate index */
         int     vbr_max_bitrate_index; /* max bitrate index */
         int     avg_bitrate;

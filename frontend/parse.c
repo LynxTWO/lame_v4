@@ -1574,19 +1574,25 @@ parse_args_(lame_global_flags * gfp, int argc, char **argv,
 
                 T_ELIF("abr")
                     /* values larger than 8000 are bps (like Fraunhofer), so it's strange to get 320000 bps MP3 when specifying 8000 bps MP3 */
-                    argUsed = getIntValue(token, nextArg, &int_value);
+                    /* v4: fractional targets allowed (e.g. --abr 191.5); an MP3's average
+                       bitrate mixes discrete frame sizes, so any fractional mean is reachable.
+                       Integral values keep the exact legacy behavior. */
+                    argUsed = getDoubleValue(token, nextArg, &double_value);
                     if (argUsed) {
-                        if (int_value >= 8000) {
-                            int_value = (int_value + 500) / 1000;
+                        if (double_value >= 8000) {
+                            double_value = ((int) (double_value + 500)) / 1000;
                         }
-                        if (int_value > 320) {
-                            int_value = 320;
+                        if (double_value > 320) {
+                            double_value = 320;
                         }
-                        if (int_value < 8) {
-                            int_value = 8;
+                        if (double_value < 8) {
+                            double_value = 8;
                         }
                         lame_set_VBR(gfp, vbr_abr);
-                        lame_set_VBR_mean_bitrate_kbps(gfp, int_value);
+                        /* Always the float setter: it also stores the rounded int (which the
+                           preset machinery keys on), and integral values are routed down the
+                           bit-identical legacy integer path inside calc_target_bits. */
+                        lame_set_VBR_mean_bitrate_float(gfp, (float) double_value);
                     }
 
                 T_ELIF2("quality-max", "qmax")
