@@ -1,9 +1,15 @@
-# ABX listening test — the CBR/ABR -q0 noise-shaping fix
+# ABX listening tests
 
-This folder lets you **blind-test** whether the `-q0` CBR/ABR fix (branch
-`qa/fix-noiseshaping-cbr`) is audibly better than stock LAME 3.100, so a human ear confirms
-what the objective meter measured. (Audio files are git-ignored — copyrighted source. Run
-`tests/make_abx.ps1` to (re)generate them from your local corpus.)
+Blind-test packages so a human ear confirms what the objective meter measured. (Audio files
+are git-ignored — copyrighted source. Run `tests/make_abx.ps1` to (re)generate them from your
+local corpus.) Two packages live here:
+
+1. **Finding 1** — the `-q0` CBR/ABR noise-shaping fix (Tom's Diner clip). **CONFIRMED
+   2026-07-02: 15/16, p = 0.0003** (log in this folder).
+2. **Finding 3** — `--quality-max` v2, the search-objective change (400 Lux, full track).
+   See "Finding 3" section below.
+
+## Finding 1 — the CBR/ABR -q0 noise-shaping fix
 
 ## The clip
 
@@ -38,9 +44,39 @@ Use foobar2000's **ABX Comparator** (or any ABX tool):
 A result is only meaningful if you score clearly above chance (e.g. ≥ 12/16 correct). Loop a
 short tricky phrase rather than the whole clip.
 
+*(Outcome: confirmed 15/16, p = 0.0003 — the fix shipped to the default `-q0` and the log is
+archived in this folder.)*
+
+## Finding 3 — `--quality-max` v2 (the search-objective change)
+
+**The claim to test:** v2 (aggregate noise objective + exhaustive search) sounds at least as
+good as v1 everywhere, and better where the meter says so (−0.94 dB mean at CBR128).
+
+**The track — 400 Lux, full length, CBR 128:** chosen *adversarially*. It is the one corpus
+file where v2's single worst band-frame got ~4 dB **louder** (33.5 → 37.7 dB over mask) even
+though its overall mean and audible fraction improved. If the objective change hides an
+audible artifact anywhere, it's here. The flagged spot is the bass-heavy onset around
+**0:21**; also try the busy passages.
+
+- `original_400lux.wav` — uncompressed reference.
+- `A_qmaxv1_b128.mp3` / `A_qmaxv1_b128_decoded.wav` — `--quality-max` **v1** (pre-Finding-3).
+- `B_qmaxv2_b128.mp3` / `B_qmaxv2_b128_decoded.wav` — `--quality-max` **v2** (current master).
+- `C_default_q0_b128.mp3` / `C_default_q0_b128_decoded.wav` — today's default `-q0`, as the
+  "does qmax beat the default" bonus comparison.
+
+**How to listen:**
+
+1. **A vs B (the decisive one):** can you tell v1 from v2 at all? If yes, which sounds
+   cleaner — especially around 0:21 and in dense sections? (Meter says B: mean −5.68 vs
+   −5.00, fewer audible bands 0.286 vs 0.321 — but B's single worst moment is hotter.)
+2. **B vs C (bonus):** the full `--quality-max` v2 payoff over the everyday default.
+3. If any spot in B sounds *worse* than A, note the timestamp — that's the worst-band
+   trade-off surfacing, and exactly what this package exists to catch.
+
 ## If you confirm it
 
-Tell the loop and we ship the fix to default `-q0` (and/or fold it into `--quality max`). If
-you *can't* hear a difference, the fix is still safe (measured better, VBR untouched,
-byte-isolated) — it just means 128 kbps voice is near the meter's floor here; try a harder
-track (SQAM glockenspiel/harpsichord/castanets, or `sample20` which measured −1.4 dB).
+Finding 1 is already shipped. For Finding 3: v2 is opt-in and all objective guardrails passed,
+so it stays merged either way — but an audible *regression* anywhere in B would reopen the
+worst-band question (we'd consider a hybrid objective that caps max_noise while minimizing the
+aggregate). A "can't tell them apart" result is also fine: it means the measured gains are
+below audibility on this material, and the mode still wins on the meter corpus-wide.
