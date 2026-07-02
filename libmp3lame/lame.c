@@ -502,9 +502,18 @@ lame_init_qval(lame_global_flags * gfp)
     if (gfp->quality_max) {
         /* (1) the thorough in-loop Huffman search q0 disables for speed (best cost model). */
         cfg->use_best_huffman = 2;
-        /* (2) the deeper noise-allocation search is enabled via cfg->quality_max and read in
-           quantize.c (outer_loop). The CBR/ABR coarse-then-fine shaping is already applied by
-           the q0 case above (now the default), so no shaping override is needed here. */
+        /* (2) exhaustive outer-loop noise-allocation search. full_outer_loop=1 disables the
+           early-stop in quantize.c outer_loop (which normally quits after ~3 non-improving
+           scalefactor tries), so the loop walks its whole balance_noise trajectory and keeps
+           the best candidate by quant_compare. CAUTION: "more search" is only better as judged
+           by quant_compare's own objective -- with the stock worst-case objective (quant_comp=1)
+           exhaustive search measured perceptually WORSE (+0.15 dB mean NMR: it concentrates
+           bits on the worst band, starving the rest). It is a win only combined with the
+           aggregate objective set for quality_max after the cfg copies in lame_init_params
+           (quant_comp=2 for CBR/ABR; deep+aggregate beat aggregate-alone by -0.13 dB there).
+           For VBR this matches the stock q0 config (already full_outer_loop=1), so it is a
+           no-op. ~4x encode time; --quality-max exists to spend it. */
+        cfg->full_outer_loop = 1;
     }
 }
 
@@ -1227,6 +1236,23 @@ lame_init_params(lame_global_flags * gfp)
 
     cfg->quant_comp = gfp->quant_comp;
     cfg->quant_comp_short = gfp->quant_comp_short;
+
+    /* v4 --quality-max: switch the long-block quantizer-comparison objective from the default
+       worst-case one (quant_comp=1, minimize the single worst band) to the aggregate one
+       (quant_comp=2, minimize the sum of per-band log noise-to-mask). The worst-case objective
+       is why "search harder" historically regressed: an exhaustive search rationally
+       concentrates bits on the loudest band and lets noise rise everywhere else. With the
+       aggregate objective the exhaustive outer-loop search (full_outer_loop=1, set in
+       lame_init_qval) becomes a strict win. Measured at CBR128 on the full corpus: -0.92 dB
+       mean NMR vs quality-max v1, 33/33 files better, audible fraction down 0.319->0.277,
+       worst-band NMR unchanged. Scoped to bit-constrained modes only (like the Finding 1 fix);
+       VBR keeps stock objectives until measured separately at equal size. quant_comp_short
+       stays 0 (over-count): on short blocks it bounds transient smearing and won the transient
+       tiebreak (Tom's Diner HF 0.59 vs 0.83). This lives HERE, not in lame_init_qval, because
+       cfg->quant_comp is copied from gfp a few lines above -- an earlier write would be lost. */
+    if (cfg->quality_max && (cfg->vbr == vbr_off || cfg->vbr == vbr_abr)) {
+        cfg->quant_comp = 2;
+    }
 
     cfg->use_temporal_masking_effect = gfp->useTemporal;
     if (cfg->mode == JOINT_STEREO) {

@@ -157,8 +157,8 @@ targets, and it only improves it.
 **15/16 correct, p = 0.0003.** The two are *reliably audibly distinguishable* (odds of that by
 guessing ≈ 0.03%). ABX proves difference, not preference per se — but the objective evidence
 (fixed measures −0.55 dB more transparent with fewer audible bands here; 59/70 SQAM files
-better) identifies the fixed encode as the cleaner one. Objective meter + professional test set
-+ human ear now all agree.
+better) identifies the fixed encode as the cleaner one. Objective meter, professional test
+set, and human ear now all agree.
 
 **Status:** validated four ways (perceptual meter, SQAM, byte-isolation, human ABX). The
 opt-in path shipped via `--quality-max` (Finding 2, merged to master). The **default-`q0`**
@@ -174,8 +174,8 @@ more when you ask.
 **Engineer:** new dedicated flag (`--quality-max` / `--qmax`; API `lame_set_quality_max`,
 config `cfg->quality_max`). Builds on the `-q0` config with (1) the in-loop Huffman search q0
 disables for speed and (2) for CBR/ABR the coarse-then-fine `amp=3` shaping from Finding 1
-(VBR unchanged). A deeper noise-allocation search is wired (`cfg->quality_max`) but not yet
-implemented — that's the next flagship increment. **Measured vs stock `-q0` (meanNMRdb, lower =
+(VBR unchanged). v2 (Finding 3) later added the aggregate search objective + exhaustive
+outer-loop search on top. **v1 measured vs stock `-q0` (meanNMRdb, lower =
 better): CBR128 −0.357, CBR320 −0.753, ABR192 −0.605; V0 0.000** (best_huffman helps VBR as
 smaller files at equal quality, which an equal-setting NMR test doesn't capture). **Purely
 additive: the bit-exact gate is 70/70 green** — every existing setting is byte-identical to
@@ -185,6 +185,77 @@ pristine 3.100.
 a widely-included header (`util.h`, `lame_global_flags.h`), you MUST `nmake -f Makefile.MSVC
 clean` before rebuilding, or stale objects with the old struct layout cause silent memory
 corruption (encode succeeds, then crashes on exit). `build.cmd clean && build.cmd` does it.
+
+### Finding 3 (major): the quantizer was optimizing the wrong objective — `--quality-max` v2
+
+**Layman:** when LAME decides how to spend its bits, it repeatedly asks "is this rounding
+better than that one?" For 25 years the comparison rule at high quality has been *"make the
+single worst spot less bad"* — even if that means everything else gets slightly noisier. We
+changed the rule under `--quality-max` to *"make the total audible noise smallest"*, and let
+the encoder search exhaustively under the new rule. Result: **every single test file improved**
+— on average by almost 1 dB, which is a bigger gain than our Finding 1 bug fix.
+
+**How we got here (the honest path, including two dead ends):**
+1. *Dead end 1 — "protect the highs on drum hits."* After the ABX test showed our Finding 1 fix
+   trades a little transient crispness for smoother texture, we tried directly protecting the
+   high-frequency bands on transients (tightening their allowed distortion in `calc_xmin`,
+   gated on `quality_max`). Measured: crisper on only 2 of 6 transient tracks *and* slightly
+   worse overall at both 128 and 320 kbps. **Rejected and reverted** — at a fixed bit budget,
+   demanding more precision in one place just steals it from everywhere else.
+2. *Dead end 2 — "just search harder."* We enabled the exhaustive outer-loop search
+   (`full_outer_loop=1`) on the stock objective. Measured: **worse** (+0.15 dB mean NMR at
+   CBR128, +0.02 at 320). This was the tell: if searching *harder* makes things *worse*, the
+   search is optimizing the wrong thing, and the early-stop had been acting as accidental
+   damage control.
+3. *The real lever — fix the objective.* `outer_loop` compares candidate quantizations with
+   `quant_compare` (`quantize.c`), selected by `cfg->quant_comp`. The default is mode 1:
+   minimize **max_noise**, the single worst band. Mode 2 instead minimizes **tot_noise**, the
+   sum of per-band log noise-to-mask. We swept objectives × search depth (via a temporary
+   env-var hook, then hard-coded the winner).
+
+**The sweep (corpus mean `meanNMRdb` at CBR 128, same binary, lower = better):**
+
+| Objective (long blocks) | normal depth | exhaustive (`full_outer_loop=1`) |
+| --- | --- | --- |
+| `max_noise` (stock q0) | −7.545 (baseline) | −7.392 ✗ worse |
+| `tot_noise` (mode 2) | −8.332 | **−8.460 ✓ winner** |
+| `klemm` (mode 8) | −8.087 | −8.096 |
+
+Two independent confirmations that this isn't metric-gaming: (a) the *klemm* objective — a
+cubic-penalty aggregate structurally different from our meter — also wins big; (b) the
+guardrail metrics moved the right way (below).
+
+**Guardrails (winner vs `--quality-max` v1, CBR 128, full corpus):**
+- Mean NMR: **−0.944 dB**, **33/33 files better, zero regressions** (worst per-file delta +0.000).
+- Audible fraction (band-frames above masking): **0.319 → 0.277**. This matters because both
+  `tot_noise` and our meter's mean give "credit" for pushing already-inaudible bands further
+  down — the audible-fraction drop proves the win is real audibility, not margin-stacking.
+- Worst single band across corpus: **98.7 → 98.7 (unchanged)** — the classic failure mode of
+  aggregate objectives (one screaming band) did not appear.
+- Transient HF fidelity: crisper on **5/6** tracks at CBR128 (castanets 3.84→2.91 — the track
+  every previous lever failed on); 3 wins/3 ties at CBR320. The one "regression" (400 Lux) is
+  a single onset whose original HF is near-silent (−22 dB) — and v2 has *less pre-echo* there.
+- Short-block objective (`quant_comp_short`) swept too (0/2/8): statistical tie on mean NMR;
+  stock mode 0 (over-count) kept — it won the transient tiebreak (Tom's Diner HF 0.59 vs 0.83)
+  and bounding the *count* of distorted bands on short blocks bounds transient smearing.
+- Bit-exact gate: **70/70 green** — every non-`--quality-max` setting byte-identical.
+- Cost: ~4× v1 encode time (~15× default; Tom's Diner 22.5 s vs 1.5 s) — still ~10× faster
+  than realtime single-threaded; exactly the trade `--quality-max` exists to make.
+
+**Result (final `--quality-max` v2 vs v1, corpus mean):** CBR128 **−0.944 dB**; CBR320
+**−0.982 dB**; ABR192 **−0.761 dB**.
+
+**Engineer (the change):** in `lame_init_params` (after the `cfg->quant_comp` copy — an earlier
+write would be clobbered): `if (cfg->quality_max && (cfg->vbr == vbr_off || cfg->vbr ==
+vbr_abr)) cfg->quant_comp = 2;` plus `cfg->full_outer_loop = 1` in the `quality_max` block of
+`lame_init_qval`. Scoped to bit-constrained modes like Finding 1; VBR keeps stock objectives
+until measured separately at equal size (a VBR win can't be judged by equal-setting NMR).
+
+**Why the stock objective was wrong for CBR/ABR (intuition):** minimizing the worst band is a
+minimax rule — sensible when bits are plentiful (VBR asks for more bits instead). Under a fixed
+budget, a minimax search pours bits into the hardest band until *something else* becomes the
+worst, round-robining precision away from the whole spectrum. The aggregate objective spends
+each bit where it buys the largest total audibility reduction — which is what a listener hears.
 
 ### Finding 0 (minor): re-enabling the in-loop Huffman search (`best_huffman = 2`)
 
@@ -243,15 +314,17 @@ result to `output/lame_fix.exe`, `git checkout master && build.cmd`, copy to
 - [x] **Finding 1: CBR/ABR `-q0` regression — confirmed, fixed, ABX-validated (15/16, p=0.0003).**
 - [x] **Finding 2: `--quality-max` mode v1** (fix + in-loop Huffman) — merged to master, 70/70
       bit-exact, measured −0.36 to −0.75 dB at CBR/ABR.
-- [ ] Owner go/no-go: merge the default-`-q0` fix (`qa/fix-noiseshaping-cbr`) to master.
-- [~] `--quality-max` v2 (in progress): the deeper noise-allocation search, gated on
-      `cfg->quality_max`. **Target defined by an ABX follow-up:** the shipped fix trades a little
-      transient HF-crispness for cleaner texture (the owner heard this and preferred the texture;
-      `tests/transient` measures it). `--quality-max` v1 already recovers transient HF *somewhat*
-      (mean error 1.16 vs default 1.49 dB on the ABX clip; 3/5 tracks better) via Huffman bit
-      savings, but inconsistently. v2 lever: protect HF scalefactor bands in short-block
-      (transient) frames under quality_max, gated by the `tests/transient` HF metric (want
-      consistently lower HF error) without raising pre-echo or overall meanNMRdb.
+- [x] ~~Owner go/no-go: merge the default-`-q0` fix~~ — merged to master (`e592af3`), re-baselined.
+- [x] **Finding 3: `--quality-max` v2** — the search *objective* was the ceiling (`quant_comp`
+      minimax → aggregate) + exhaustive outer-loop search. −0.94 dB vs v1 at CBR128, 33/33
+      better, audible fraction down, 70/70 bit-exact. Also resolves the ABX follow-up: transient
+      HF crisper on 5/6 tracks (castanets 3.84→2.91). Two candidate levers tested and honestly
+      rejected on the way (HF-band protection; deeper search on the stock objective — both
+      measured worse; see Finding 3).
+- [ ] ABX the v2 mode (stretch: 400 Lux, whose single worst band-frame rose ~4 dB while its
+      mean and audible fraction improved — confirm inaudible).
+- [ ] Revisit VBR under `--quality-max` with an equal-size methodology (objective change is
+      currently scoped to CBR/ABR only).
 - [ ] Podcast constrained-optimizer (design in `docs/podcast-optimizer-design.md`): ABR-centered
       parallel legal-candidate search; 192 kbps stereo / 96 kbps mono; never cap frames w/ `-B`.
 - [ ] Multithreading (bit-exact) to *fund* the expensive search; AVX2 SIMD on the scalar hot
