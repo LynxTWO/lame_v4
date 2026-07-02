@@ -325,8 +325,12 @@ result to `output/lame_fix.exe`, `git checkout master && build.cmd`, copy to
       mean and audible fraction improved — confirm inaudible).
 - [ ] Revisit VBR under `--quality-max` with an equal-size methodology (objective change is
       currently scoped to CBR/ABR only).
-- [ ] Podcast constrained-optimizer (design in `docs/podcast-optimizer-design.md`): ABR-centered
-      parallel legal-candidate search; 192 kbps stereo / 96 kbps mono; never cap frames w/ `-B`.
+- [x] Podcast constrained-optimizer v1 (`tools/podcast/`, design + implementation notes in
+      `docs/podcast-optimizer-design.md`): parallel legal-candidate search over ~28
+      standards-compliant settings; measured-average window `[target−0.5, target]`; CBR floor
+      guarantees a legal winner; scored by the `nmr` meter. First real runs picked
+      `--abr 192 --quality-max --lowpass 16` (stereo) and `-b 96 --quality-max --lowpass 15.5`
+      (mono) on a cappella voice — measured, not assumed.
 - [ ] Multithreading (bit-exact) to *fund* the expensive search; AVX2 SIMD on the scalar hot
       loops; modern CMake/CI; fuzz the decoder.
 
