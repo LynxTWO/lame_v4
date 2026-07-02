@@ -758,7 +758,9 @@ long_help(const lame_global_flags * gfp, FILE * const fp, const char *ProgramNam
             "    -h              Same as -q 2.   \n"
             "    -f              Same as -q 7.   Fast, ok quality\n"
             "    --quality-max   maximum-effort search, beyond -q 0 (much slower;\n"
-            "                    best quality; alias --qmax)\n");
+            "                    best quality; alias --qmax)\n"
+            "    --threads <n>   use <n> worker threads where possible (stereo CBR/ABR);\n"
+            "                    output is bit-identical to single-threaded\n");
 
     wait_for(fp, lessmode);
     fprintf(fp,
@@ -1599,6 +1601,12 @@ parse_args_(lame_global_flags * gfp, int argc, char **argv,
                     /* v4: maximum-effort quality mode. Opt-in; spends extra CPU searching
                        legal MP3 encodings for higher quality. Does not change other settings. */
                     (void) lame_set_quality_max(gfp, 1);
+
+                T_ELIF("threads")
+                    /* v4: worker threads; output stays bit-identical to single-threaded. */
+                    argUsed = getIntValue(token, nextArg, &int_value);
+                    if (argUsed)
+                        (void) lame_set_threads(gfp, int_value);
 
                 T_ELIF("r3mix")
                     lame_set_preset(gfp, R3MIX);

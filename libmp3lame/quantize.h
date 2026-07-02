@@ -34,5 +34,11 @@ void    VBR_new_iteration_loop(lame_internal_flags * gfc, const FLOAT pe[2][2],
 void    ABR_iteration_loop(lame_internal_flags * gfc, const FLOAT pe[2][2],
                            const FLOAT ms_ratio[2], const III_psy_ratio ratio[2][2]);
 
+/* v4 channel-parallel quantization worker (bit-exact; see gfc->qnt_worker in util.h).
+   start returns 1 and sets qnt_worker.running on success, 0 otherwise (the encoder then
+   just runs sequentially). stop is safe to call whether or not start succeeded. */
+int     lame_quantize_worker_start(lame_internal_flags * gfc);
+void    lame_quantize_worker_stop(lame_internal_flags * gfc);
+
 
 #endif /* LAME_QUANTIZE_H */

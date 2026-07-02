@@ -394,6 +394,29 @@ lame_get_quality_max(const lame_global_flags * gfp)
     return 0;
 }
 
+/* v4: worker threads. >=2 enables channel-parallel quantization where eligible (stereo
+   CBR/ABR with substep shaping off); output is bit-identical to single-threaded encoding
+   (the two channels' searches touch disjoint state). Ineligible sessions silently run
+   sequentially. Currently 2 is the maximum useful value. */
+int
+lame_set_threads(lame_global_flags * gfp, int threads)
+{
+    if (is_lame_global_flags_valid(gfp)) {
+        gfp->num_threads = threads < 1 ? 1 : threads;
+        return 0;
+    }
+    return -1;
+}
+
+int
+lame_get_threads(const lame_global_flags * gfp)
+{
+    if (is_lame_global_flags_valid(gfp)) {
+        return gfp->num_threads;
+    }
+    return 0;
+}
+
 
 /* mode = STEREO, JOINT_STEREO, DUAL_CHANNEL (not supported), MONO */
 int

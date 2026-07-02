@@ -402,6 +402,8 @@ extern  "C" {
         vbr_mode vbr;
         int     vbr_avg_bitrate_kbps;
         FLOAT   vbr_avg_bitrate_float; /* v4: fractional ABR target; 0 = use the integer field */
+        int     threads;         /* v4: requested worker count; >=2 enables channel-parallel
+                                    quantization where eligible (stereo CBR/ABR, substep off) */
         int     vbr_min_bitrate_index; /* min bitrate index */
         int     vbr_max_bitrate_index; /* max bitrate index */
         int     avg_bitrate;
@@ -503,6 +505,22 @@ extern  "C" {
         EncStateVar_t sv_enc; /* DATA FROM ENCODER.C */
         EncResult_t ov_enc;
         QntStateVar_t sv_qnt; /* DATA FROM QUANTIZE.C */
+
+        /* v4 channel-parallel quantization worker (quantize.c). One persistent OS thread per
+           encoder instance runs channel 1's quantize_gr_ch while the main thread runs channel
+           0's; handles are void* to keep OS headers out of util.h. running==0 means the
+           sequential path is used (default, and always for mono/VBR/substep sessions). */
+        struct {
+            void   *thread;         /* HANDLE (Win32) */
+            void   *ev_go;          /* auto-reset event: job ready */
+            void   *ev_done;        /* auto-reset event: job finished */
+            void const *job_ratio;  /* const III_psy_ratio (*)[2] of the current frame */
+            int     job_gr;
+            int     job_targ_bits;
+            int     job_silence;    /* analog_silence_bits, or -1 for CBR semantics */
+            int     exit_flag;
+            int     running;
+        } qnt_worker;
 
         RpgStateVar_t sv_rpg;
         RpgResult_t ov_rpg;

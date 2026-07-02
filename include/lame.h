@@ -268,6 +268,13 @@ int CDECL lame_get_quality(const lame_global_flags *);
 int CDECL lame_set_quality_max(lame_global_flags *, int);
 int CDECL lame_get_quality_max(const lame_global_flags *);
 
+/* v4 worker threads: >=2 enables channel-parallel quantization where eligible (stereo
+   CBR/ABR). Output is BIT-IDENTICAL to single-threaded encoding -- this trades cores for
+   wall time only, never quality. Ineligible sessions (mono, VBR, substep shaping) run
+   sequentially. Default 1 (off). */
+int CDECL lame_set_threads(lame_global_flags *, int);
+int CDECL lame_get_threads(const lame_global_flags *);
+
 /*
   mode = 0,1,2,3 = stereo, jstereo, dual channel (not supported), mono
   default: lame picks based on compression ration and input channels

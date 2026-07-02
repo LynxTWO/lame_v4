@@ -239,8 +239,14 @@ guardrail metrics moved the right way (below).
   stock mode 0 (over-count) kept — it won the transient tiebreak (Tom's Diner HF 0.59 vs 0.83)
   and bounding the *count* of distorted bands on short blocks bounds transient smearing.
 - Bit-exact gate: **70/70 green** — every non-`--quality-max` setting byte-identical.
-- Cost: ~4× v1 encode time (~15× default; Tom's Diner 22.5 s vs 1.5 s) — still ~10× faster
-  than realtime single-threaded; exactly the trade `--quality-max` exists to make.
+- Cost: **neutral** — v2 encodes at default `-q0` speed (~113× realtime; Tom's Diner 1.4 s),
+  and ~4.6× *faster* than v1 (6.5 s). We initially reported "~4× slower" from a measurement
+  taken while a corpus validation saturated the machine — a contention artifact, corrected
+  here. The mechanism: v1's worst-case objective drove the Huffman-costed search into an
+  expensive amplification spiral; the aggregate objective avoids it, fixing the slowdown as a
+  side effect of fixing quality. Profiling fallout: encode time at *every* effort level
+  (`-q9` → `--quality-max`) is ~identical — the analysis front (filterbank/MDCT/psymodel)
+  dominates, quantization is nearly free. That reshapes where any future speed work must aim.
 
 **Result (final `--quality-max` v2 vs v1, corpus mean):** CBR128 **−0.944 dB**; CBR320
 **−0.982 dB**; ABR192 **−0.761 dB**.
@@ -256,6 +262,39 @@ minimax rule — sensible when bits are plentiful (VBR asks for more bits instea
 budget, a minimax search pours bits into the hardest band until *something else* becomes the
 worst, round-robining precision away from the whole spectrum. The aggregate objective spends
 each bit where it buys the largest total audibility reduction — which is what a listener hears.
+
+### Finding 4: bit-exact channel-parallel quantization — built, proven, and honestly shelved
+
+**Layman:** we made LAME able to use two CPU cores on one file — with the *guarantee* that the
+output is byte-for-byte identical to single-threaded (this trades cores for wall time only,
+never quality). Then honest measurement showed it doesn't help *yet*: at today's settings the
+part we parallelized is nearly free. It ships off-by-default as the foundation for when a
+future, deeper search makes that part expensive again.
+
+**Engineer:** `--threads 2` / `lame_set_threads`. The per-(granule,channel) quantization body
+was extracted verbatim into `quantize_gr_ch` (refactor alone re-verified 70/70 bit-exact);
+a persistent Win32 worker runs channel 1's search while the main thread runs channel 0's.
+Bit-exactness is by construction, from an audited decomposition:
+- the only per-channel mutable state on the search path is `sv_qnt.CurrentStep[ch]` /
+  `OldValue[ch]` — disjoint slots per channel (granules of the *same* channel chain through
+  them, so granules stay sequential);
+- `sv_qnt.masking_lower` is never read by the search (its only readers are in `psymodel.c`,
+  next frame) — writes stay on the main thread in loop order;
+- `sv_qnt.pseudohalf[]` is shared but only live under substep shaping — all its accesses are
+  now gated on `substep_shaping & 2`, and the threaded mode requires substep off;
+- everything else reached from the search (`calc_xmin`, `outer_loop`, `count_bits`) reads
+  `gfc` as const and writes only `cod_info`/locals.
+Eligibility (worker created at all): stereo, CBR/ABR, substep off; anything else runs the
+untouched sequential path. **Verified: the 70-case gate passes both with `--threads 2` and
+without, against the same baseline.**
+
+**Why shelved:** profiling on real music shows encode time is ~identical at *every* effort
+level (`-q9` 1.45 s, `-q0` 1.39 s, `--quality-max` 1.39 s on a 157 s track) — the analysis
+front (filterbank/MDCT/psymodel) dominates; quantization is ~3% of runtime, so parallelizing
+it wins nothing today (measured 0.94×: pure dispatch overhead). It becomes valuable exactly
+when a deeper noise-allocation search (quality-max v3, e.g. trellis) makes quantization
+dominant. Any future *analysis-side* threading needs its own shared-state audit (the psymodel
+couples channels through mid/side and loudness).
 
 ### Finding 0 (minor): re-enabling the in-loop Huffman search (`best_huffman = 2`)
 
@@ -337,8 +376,12 @@ result to `output/lame_fix.exe`, `git checkout master && build.cmd`, copy to
       format. Integral values take the legacy integer arithmetic verbatim (bit-identical);
       fractional ones refine the per-frame target in `calc_target_bits`. Measured: sizes
       strictly monotone through 191 → 191.25 → 191.5 → 191.75 → 192.
-- [ ] Multithreading (bit-exact) to *fund* the expensive search; AVX2 SIMD on the scalar hot
-      loops; modern CMake/CI; fuzz the decoder.
+- [x] **Finding 4: bit-exact channel-parallel quantization** (`--threads 2`) — built, gate
+      passes 70/70 with threads on AND off; honestly shelved (quantization is ~3% of runtime;
+      the analysis front dominates at every effort level). Foundation for quality-max v3.
+- [ ] Modern-century track, re-aimed by the Finding 4 profile: CMake + CI, fuzz the mpglib
+      decoder, and (for speed) an analysis-front audit — psymodel/MDCT is where the time is;
+      its channel coupling (mid/side, loudness) needs its own shared-state audit first.
 
 ---
 

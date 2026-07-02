@@ -19,7 +19,10 @@ param(
     # Real/user tracks live in corpus/ and are used by abtest.ps1 for QUALITY, not here.
     [string]$Corpus = "$PSScriptRoot\regress_corpus",
     [string]$Work   = "$PSScriptRoot\out",
-    [string]$BaselineFile = "$PSScriptRoot\baseline.json"
+    [string]$BaselineFile = "$PSScriptRoot\baseline.json",
+    # Appended to every encode. Lets bit-identical-by-design options prove themselves against
+    # the SAME baseline, e.g. -ExtraArgs '--threads 2' must still pass all 70 cases.
+    [string]$ExtraArgs = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -37,6 +40,7 @@ $settings = @(
 )
 # Applied to every encode: no bitstream tag, no lame tag frame -> output is pure codec bytes.
 $common = @('--quiet','--nohist','-t')
+if ($ExtraArgs -ne '') { $common += @($ExtraArgs -split '\s+' | Where-Object { $_ -ne '' }) }
 
 if (-not (Test-Path $Lame)) { throw "lame.exe not found at $Lame - build first (build.cmd)." }
 if (-not (Test-Path $Work)) { New-Item -ItemType Directory -Force $Work | Out-Null }

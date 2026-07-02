@@ -304,3 +304,5 @@ lame_set_quality_max	@2027
 lame_get_quality_max	@2028
 lame_set_VBR_mean_bitrate_float	@2029
 lame_get_VBR_mean_bitrate_float	@2030
+lame_set_threads	@2031
+lame_get_threads	@2032

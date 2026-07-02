@@ -512,7 +512,9 @@ lame_init_qval(lame_global_flags * gfp)
            aggregate objective set for quality_max after the cfg copies in lame_init_params
            (quant_comp=2 for CBR/ABR; deep+aggregate beat aggregate-alone by -0.13 dB there).
            For VBR this matches the stock q0 config (already full_outer_loop=1), so it is a
-           no-op. ~4x encode time; --quality-max exists to spend it. */
+           no-op. Encode cost measured NEUTRAL vs default -q0 (the aggregate objective avoids
+           the expensive amplification spiral the worst-case objective provoked, which also
+           made this mode ~4x faster than quality-max v1). */
         cfg->full_outer_loop = 1;
     }
 }
@@ -1374,6 +1376,19 @@ lame_init_params(lame_global_flags * gfp)
         hip_set_msgf(gfc->hip, gfp->report.msgf);
     }
 #endif
+
+    /* v4 channel-parallel quantization: start the worker only for sessions where the
+       decomposition is proven bit-exact -- stereo output, bit-constrained mode (the CBR/ABR
+       iteration loops), substep shaping off (pseudohalf[] is shared state under substep).
+       Everything else, and any thread-creation failure, just runs sequentially. */
+    cfg->threads = gfp->num_threads;
+    lame_quantize_worker_stop(gfc); /* re-init safety: lame_init_params can be called again */
+    if (cfg->threads >= 2 && cfg->channels_out == 2
+        && (cfg->vbr == vbr_off || cfg->vbr == vbr_abr)
+        && !(gfc->sv_qnt.substep_shaping & 2)) {
+        (void) lame_quantize_worker_start(gfc);
+    }
+
     /* updating lame internal flags finished successful */
     gfc->lame_init_params_successful = 1;
     return 0;
@@ -2316,6 +2331,8 @@ lame_close(lame_global_flags * gfp)
         if (NULL != gfc) {
             gfc->lame_init_params_successful = 0;
             gfc->class_id = 0;
+            /* v4: join and release the quantization worker before gfc is freed. */
+            lame_quantize_worker_stop(gfc);
             /* this routine will free all malloc'd data in gfc, and then free gfc: */
             freegfc(gfc);
             gfp->internal_flags = NULL;

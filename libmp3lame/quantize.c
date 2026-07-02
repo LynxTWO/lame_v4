@@ -129,12 +129,15 @@ init_xrpow(lame_internal_flags * gfc, gr_info * const cod_info, FLOAT xrpow[576]
     /*  return 1 if we have something to quantize, else 0
      */
     if (sum > (FLOAT) 1E-20) {
-        int     j = 0;
-        if (gfc->sv_qnt.substep_shaping & 2)
-            j = 1;
-
-        for (i = 0; i < cod_info->psymax; i++)
-            gfc->sv_qnt.pseudohalf[i] = j;
+        /* pseudohalf[] is only consumed by the substep-shaping path in amp_scalefac_bands.
+           Writing it only when that path is live keeps this function free of shared-state
+           writes otherwise (the array is calloc-zero and stays zero when substep is off) --
+           which is what lets the per-channel quantization run on a worker thread (v4
+           threading; the threaded path requires substep off for exactly this reason). */
+        if (gfc->sv_qnt.substep_shaping & 2) {
+            for (i = 0; i < cod_info->psymax; i++)
+                gfc->sv_qnt.pseudohalf[i] = 1;
+        }
 
         return 1;
     }
@@ -968,7 +971,12 @@ balance_noise(lame_internal_flags * gfc,
      *  lets try setting scalefac_scale=1
      */
     if (cfg->noise_shaping > 1) {
-        memset(&gfc->sv_qnt.pseudohalf[0], 0, sizeof(gfc->sv_qnt.pseudohalf));
+        /* pseudohalf[] can only be nonzero under substep shaping (all its writers are gated
+           on substep_shaping & 2), so this reset is a no-op without it -- and skipping it
+           keeps the search path free of shared-state writes for the threaded (per-channel
+           worker) mode, which requires substep off. */
+        if (gfc->sv_qnt.substep_shaping & 2)
+            memset(&gfc->sv_qnt.pseudohalf[0], 0, sizeof(gfc->sv_qnt.pseudohalf));
         if (!cod_info->scalefac_scale) {
             inc_scalefac_scale(cod_info, xrpow);
             status = 0;
@@ -1903,6 +1911,189 @@ calc_target_bits(lame_internal_flags * gfc,
 
 
 
+/************************************************************************
+ *
+ *      quantize_gr_ch()
+ *
+ *  v4: one (granule, channel) quantization work item, extracted from
+ *  CBR_iteration_loop / ABR_iteration_loop verbatim so the same code can
+ *  run either inline (sequential, bit-identical to the historical loops)
+ *  or on a worker thread (channel-parallel).
+ *
+ *  Thread-safety contract (why channel-parallel is bit-exact):
+ *   - l3_xmin/xrpow are locals -> per-thread stacks.
+ *   - The only per-channel mutable state in gfc is sv_qnt.CurrentStep[ch]
+ *     and sv_qnt.OldValue[ch] -- disjoint slots per channel. Granules of
+ *     the SAME channel chain through them and must stay sequential.
+ *   - sv_qnt.masking_lower is NOT read on this path (its only readers are
+ *     in psymodel.c, next frame); the callers keep writing it in loop
+ *     order on the main thread.
+ *   - sv_qnt.pseudohalf[] is only touched under substep_shaping & 2; the
+ *     threaded mode requires substep off (all its accesses are gated).
+ *   - Everything else reached from here (calc_xmin, outer_loop, count_bits)
+ *     reads gfc as const and writes only cod_info/locals.
+ *  iteration_finish_one (scfsi + reservoir) stays with the callers, in
+ *  sequential channel order.
+ *
+ *  analog_silence_bits >= 0 selects the ABR semantics (analog-silence
+ *  frames get that fixed budget); pass -1 for CBR.
+ *
+ ************************************************************************/
+static void
+quantize_gr_ch(lame_internal_flags * gfc, const III_psy_ratio ratio[2][2],
+               int gr, int ch, int targ_bits_ch, int analog_silence_bits)
+{
+    FLOAT   l3_xmin[SFBMAX];
+    FLOAT   xrpow[576];
+    gr_info *const cod_info = &gfc->l3_side.tt[gr][ch];
+
+    /*  init_outer_loop sets up cod_info, scalefac and xrpow
+     */
+    init_outer_loop(gfc, cod_info);
+    if (init_xrpow(gfc, cod_info, xrpow)) {
+        /*  xr contains energy we will have to encode
+         *  calculate the masking abilities
+         *  find some good quantization in outer_loop
+         */
+        int const ath_over = calc_xmin(gfc, &ratio[gr][ch], cod_info, l3_xmin);
+        if (analog_silence_bits >= 0 && 0 == ath_over) /* ABR: analog silence */
+            targ_bits_ch = analog_silence_bits;
+        (void) outer_loop(gfc, cod_info, l3_xmin, xrpow, ch, targ_bits_ch);
+    }
+}
+
+
+/************************************************************************
+ *
+ *  v4 channel-parallel quantization worker.
+ *
+ *  One persistent OS thread per encoder instance. Per granule the main
+ *  thread dispatches channel 1 to the worker, runs channel 0 itself, then
+ *  joins -- so the two outer_loop searches (the dominant cost, especially
+ *  under --quality-max) run concurrently. Output is bit-identical to the
+ *  sequential loops because the two channels touch disjoint mutable state
+ *  (see quantize_gr_ch's contract above). Win32 only for now; on other
+ *  platforms start() returns 0 and the encoder runs sequentially.
+ *
+ ************************************************************************/
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#include <process.h>
+
+static unsigned __stdcall
+quantize_worker_main(void *arg)
+{
+    lame_internal_flags *const gfc = (lame_internal_flags *) arg;
+    for (;;) {
+        WaitForSingleObject((HANDLE) gfc->qnt_worker.ev_go, INFINITE);
+        if (gfc->qnt_worker.exit_flag)
+            break;
+        quantize_gr_ch(gfc, (const III_psy_ratio(*)[2]) gfc->qnt_worker.job_ratio,
+                       gfc->qnt_worker.job_gr, 1,
+                       gfc->qnt_worker.job_targ_bits, gfc->qnt_worker.job_silence);
+        SetEvent((HANDLE) gfc->qnt_worker.ev_done);
+    }
+    return 0;
+}
+
+int
+lame_quantize_worker_start(lame_internal_flags * gfc)
+{
+    gfc->qnt_worker.exit_flag = 0;
+    gfc->qnt_worker.running = 0;
+    gfc->qnt_worker.ev_go = CreateEventW(NULL, FALSE, FALSE, NULL);
+    gfc->qnt_worker.ev_done = CreateEventW(NULL, FALSE, FALSE, NULL);
+    if (gfc->qnt_worker.ev_go && gfc->qnt_worker.ev_done) {
+        gfc->qnt_worker.thread =
+            (void *) _beginthreadex(NULL, 0, quantize_worker_main, gfc, 0, NULL);
+        if (gfc->qnt_worker.thread) {
+            gfc->qnt_worker.running = 1;
+            return 1;
+        }
+    }
+    lame_quantize_worker_stop(gfc);
+    return 0;
+}
+
+void
+lame_quantize_worker_stop(lame_internal_flags * gfc)
+{
+    if (gfc->qnt_worker.thread) {
+        gfc->qnt_worker.exit_flag = 1;
+        SetEvent((HANDLE) gfc->qnt_worker.ev_go);
+        WaitForSingleObject((HANDLE) gfc->qnt_worker.thread, INFINITE);
+        CloseHandle((HANDLE) gfc->qnt_worker.thread);
+        gfc->qnt_worker.thread = NULL;
+    }
+    if (gfc->qnt_worker.ev_go) {
+        CloseHandle((HANDLE) gfc->qnt_worker.ev_go);
+        gfc->qnt_worker.ev_go = NULL;
+    }
+    if (gfc->qnt_worker.ev_done) {
+        CloseHandle((HANDLE) gfc->qnt_worker.ev_done);
+        gfc->qnt_worker.ev_done = NULL;
+    }
+    gfc->qnt_worker.running = 0;
+}
+
+/* Dispatch ch1 to the worker, run ch0 inline, wait for the worker.
+   SetEvent/WaitForSingleObject are full memory barriers, so the worker sees the job fields
+   and the main thread sees all of the worker's writes at the join. */
+static void
+quantize_both_channels(lame_internal_flags * gfc, const III_psy_ratio ratio[2][2],
+                       int gr, int targ_bits_ch0, int targ_bits_ch1, int analog_silence_bits)
+{
+    gfc->qnt_worker.job_ratio = ratio;
+    gfc->qnt_worker.job_gr = gr;
+    gfc->qnt_worker.job_targ_bits = targ_bits_ch1;
+    gfc->qnt_worker.job_silence = analog_silence_bits;
+    SetEvent((HANDLE) gfc->qnt_worker.ev_go);
+    quantize_gr_ch(gfc, ratio, gr, 0, targ_bits_ch0, analog_silence_bits);
+    WaitForSingleObject((HANDLE) gfc->qnt_worker.ev_done, INFINITE);
+}
+
+#else  /* !_WIN32: no worker yet; encoder always runs the sequential path */
+
+int
+lame_quantize_worker_start(lame_internal_flags * gfc)
+{
+    gfc->qnt_worker.running = 0;
+    return 0;
+}
+
+void
+lame_quantize_worker_stop(lame_internal_flags * gfc)
+{
+    gfc->qnt_worker.running = 0;
+}
+
+/* Never reached (running is always 0 here); sequential fallback keeps the call site portable. */
+static void
+quantize_both_channels(lame_internal_flags * gfc, const III_psy_ratio ratio[2][2],
+                       int gr, int targ_bits_ch0, int targ_bits_ch1, int analog_silence_bits)
+{
+    quantize_gr_ch(gfc, ratio, gr, 0, targ_bits_ch0, analog_silence_bits);
+    quantize_gr_ch(gfc, ratio, gr, 1, targ_bits_ch1, analog_silence_bits);
+}
+
+#endif /* _WIN32 */
+
+/* masking_lower for the threaded branch: same value the sequential loop computes (the
+   historical "- adjust" is dropped only because adjust is the constant 0 there; x - 0.0 is
+   bitwise x in IEEE, so the stored value -- read only by the NEXT frame's psymodel -- is
+   identical either way). */
+static void
+set_masking_lower(lame_internal_flags * gfc, int gr, int ch)
+{
+    gr_info const *const cod_info = &gfc->l3_side.tt[gr][ch];
+    FLOAT const masking_lower_db = (cod_info->block_type != SHORT_TYPE)
+        ? gfc->sv_qnt.mask_adjust : gfc->sv_qnt.mask_adjust_short;
+    gfc->sv_qnt.masking_lower = pow(10.0, masking_lower_db * 0.1);
+}
+
+
 /********************************************************************
  *
  *  ABR_iteration_loop()
@@ -1919,14 +2110,14 @@ ABR_iteration_loop(lame_internal_flags * gfc, const FLOAT pe[2][2],
 {
     SessionConfig_t const *const cfg = &gfc->cfg;
     EncResult_t *const eov = &gfc->ov_enc;
-    FLOAT   l3_xmin[SFBMAX];
-    FLOAT   xrpow[576];
     int     targ_bits[2][2];
     int     mean_bits, max_frame_bits;
-    int     ch, gr, ath_over;
+    int     ch, gr;
     int     analog_silence_bits;
     gr_info *cod_info;
     III_side_info_t *const l3_side = &gfc->l3_side;
+
+    int const use_worker = gfc->qnt_worker.running && cfg->channels_out == 2;
 
     mean_bits = 0;
 
@@ -1938,6 +2129,19 @@ ABR_iteration_loop(lame_internal_flags * gfc, const FLOAT pe[2][2],
 
         if (gfc->ov_enc.mode_ext == MPG_MD_MS_LR) {
             ms_convert(&gfc->l3_side, gr);
+        }
+        if (use_worker) {
+            /* v4 channel-parallel path: masking_lower writes stay on this thread in loop
+               order (workers never read it), both channels quantize concurrently, then the
+               ordered finish (scfsi + reservoir) runs sequentially. Bit-identical to the
+               sequential branch below. */
+            set_masking_lower(gfc, gr, 0);
+            set_masking_lower(gfc, gr, 1);
+            quantize_both_channels(gfc, ratio, gr, targ_bits[gr][0], targ_bits[gr][1],
+                                   analog_silence_bits);
+            iteration_finish_one(gfc, gr, 0);
+            iteration_finish_one(gfc, gr, 1);
+            continue;
         }
         for (ch = 0; ch < cfg->channels_out; ch++) {
             FLOAT   adjust, masking_lower_db;
@@ -1955,21 +2159,7 @@ ABR_iteration_loop(lame_internal_flags * gfc, const FLOAT pe[2][2],
             }
             gfc->sv_qnt.masking_lower = pow(10.0, masking_lower_db * 0.1);
 
-
-            /*  cod_info, scalefac and xrpow get initialized in init_outer_loop
-             */
-            init_outer_loop(gfc, cod_info);
-            if (init_xrpow(gfc, cod_info, xrpow)) {
-                /*  xr contains energy we will have to encode
-                 *  calculate the masking abilities
-                 *  find some good quantization in outer_loop
-                 */
-                ath_over = calc_xmin(gfc, &ratio[gr][ch], cod_info, l3_xmin);
-                if (0 == ath_over) /* analog silence */
-                    targ_bits[gr][ch] = analog_silence_bits;
-
-                (void) outer_loop(gfc, cod_info, l3_xmin, xrpow, ch, targ_bits[gr][ch]);
-            }
+            quantize_gr_ch(gfc, ratio, gr, ch, targ_bits[gr][ch], analog_silence_bits);
             iteration_finish_one(gfc, gr, ch);
         }               /* ch */
     }                   /* gr */
@@ -2006,13 +2196,12 @@ CBR_iteration_loop(lame_internal_flags * gfc, const FLOAT pe[2][2],
                    const FLOAT ms_ener_ratio[2], const III_psy_ratio ratio[2][2])
 {
     SessionConfig_t const *const cfg = &gfc->cfg;
-    FLOAT   l3_xmin[SFBMAX];
-    FLOAT   xrpow[576];
     int     targ_bits[2];
     int     mean_bits, max_bits;
     int     gr, ch;
     III_side_info_t *const l3_side = &gfc->l3_side;
     gr_info *cod_info;
+    int const use_worker = gfc->qnt_worker.running && cfg->channels_out == 2;
 
     (void) ResvFrameBegin(gfc, &mean_bits);
 
@@ -2026,6 +2215,19 @@ CBR_iteration_loop(lame_internal_flags * gfc, const FLOAT pe[2][2],
         if (gfc->ov_enc.mode_ext == MPG_MD_MS_LR) {
             ms_convert(&gfc->l3_side, gr);
             reduce_side(targ_bits, ms_ener_ratio[gr], mean_bits, max_bits);
+        }
+
+        if (use_worker) {
+            /* v4 channel-parallel path (see ABR_iteration_loop's twin for the contract). */
+            set_masking_lower(gfc, gr, 0);
+            set_masking_lower(gfc, gr, 1);
+            quantize_both_channels(gfc, ratio, gr, targ_bits[0], targ_bits[1], -1);
+            for (ch = 0; ch < 2; ch++) {
+                iteration_finish_one(gfc, gr, ch);
+                assert(l3_side->tt[gr][ch].part2_3_length <= MAX_BITS_PER_CHANNEL);
+                assert(l3_side->tt[gr][ch].part2_3_length <= targ_bits[ch]);
+            }
+            continue;
         }
 
         for (ch = 0; ch < cfg->channels_out; ch++) {
@@ -2044,17 +2246,7 @@ CBR_iteration_loop(lame_internal_flags * gfc, const FLOAT pe[2][2],
             }
             gfc->sv_qnt.masking_lower = pow(10.0, masking_lower_db * 0.1);
 
-            /*  init_outer_loop sets up cod_info, scalefac and xrpow
-             */
-            init_outer_loop(gfc, cod_info);
-            if (init_xrpow(gfc, cod_info, xrpow)) {
-                /*  xr contains energy we will have to encode
-                 *  calculate the masking abilities
-                 *  find some good quantization in outer_loop
-                 */
-                (void) calc_xmin(gfc, &ratio[gr][ch], cod_info, l3_xmin);
-                (void) outer_loop(gfc, cod_info, l3_xmin, xrpow, ch, targ_bits[ch]);
-            }
+            quantize_gr_ch(gfc, ratio, gr, ch, targ_bits[ch], -1);
 
             iteration_finish_one(gfc, gr, ch);
             assert(cod_info->part2_3_length <= MAX_BITS_PER_CHANNEL);
