@@ -221,8 +221,12 @@ Measured against stock `-q0`, meanNMRdb, lower is better:
 | ABR 192 | -0.605 |
 | V0 | 0.000 by equal-setting NMR |
 
-The VBR row needs a caveat: the Huffman search helps VBR as smaller files at equal quality,
-which an equal-setting NMR comparison cannot see.
+The VBR row was later resolved precisely by the equal-measured-size harness:
+`--quality-max` is a no-op for the modern VBR path. `vbr_mtrh` (the `-V` default) runs
+through `vbrquantize.c`, which consults neither `use_best_huffman` nor `full_outer_loop`;
+bisected to matched bitrates, stock and quality-max VBR encodes are byte-identical on every
+holdout file. Making the flag mean something for VBR requires wiring deeper search into
+`VBR_encode_granule` itself, which is future work.
 
 Safety receipt: purely additive, bit-exact gate 70/70 green for every existing setting.
 
@@ -633,14 +637,44 @@ the discipline it forced into existence: the holdout methodology, the audibility
 veto, and the two tooling traps it caught (dead knobs, missing tag). Per-rate campaigns can
 reuse all of it, with expectations set accordingly.
 
+#### Campaigns 8-10. Per-rate: the bass finding pays, and at 320 it pays big.
+
+The "expectations set accordingly" above turned out to be too modest at high bitrate. Three
+campaigns with the honest chain and live veto, one per remaining mode:
+
+| Campaign | Setting | Winner | Train | SQAM holdout | Library holdout |
+| --- | --- | --- | --- | --- | --- |
+| 8 | `-q 0 -b 320` | `--ns-bass -8.00 --ns-alto -8.00 --ns-treble 5.46 --ns-sfb21 4.26 --nsmsfix 1.91 --shortthreshold 5.46,31.01 --athlower 5.22` | -2.27 | **-1.81** | **-2.81** |
+| 9 | `-q 0 --abr 192` | `--ns-bass -5.00 --shortthreshold 4.19,23.83` | -0.29 | -0.22 | -0.31 |
+| 10 | `--quality-max -b 128` | 7-knob config, near-baseline | -0.09 | (triaged) | -0.10 |
+
+The CBR 320 result is the largest validated quality gain of the project, and it is the
+anti-pattern of the rejected campaigns: audible errors get quieter on every holdout file
+(-0.68 to -2.18 dB per file), transients stay clean (sub-dB, HF crisper on 2 of 3
+attack-heavy tracks), and the veto endorsed it with improving val audNMR, the first
+wide-bounds config a working veto has ever passed.
+
+The direction is consistent physics, not noise: `ns-bass` negative (tighten bass masking,
+spend more there) now appears independently in the campaign-7, ABR, and CBR 320 winners, at
+-2.5, -5, and -8 as the budget grows. The 2002 tuning under-protects bass, and the more
+bits available, the more the correction is worth. At quality-max the campaign was
+near-null, consistent with Finding 3's objective fix having already taken that mode's
+headroom.
+
 #### Status
 
-Campaign-7 winner (`--ns-bass -2.50 --athlower 1.50`): validated opt-in configuration,
-ABX-tested (no audible difference; log in `tests/abx/`). Not a default change.
+Four validated opt-in configurations, none a default change:
+
+| Mode | Configuration | Holdout gain |
+| --- | --- | --- |
+| `-q 0 -b 128` | `--ns-bass -2.50 --athlower 1.50` (campaign 7, ABX: no audible difference) | -0.12 / -0.22 |
+| `-q 0 -b 320` | campaign-8 winner above | -1.81 / -2.81 |
+| `-q 0 --abr 192` | `--ns-bass -5.00 --shortthreshold 4.19,23.83` | -0.22 / -0.31 |
+| `--quality-max -b 128` | campaign-10 winner | -0.10 |
+
 Campaign-1 winner: demoted, receipts above. Campaigns 2 through 5: rejected on holdouts and
-guardrails; receipts in `tests/autotune_q0_cbr128.csv` through `autotune5_q0_cbr128.csv`.
-Campaign 6: superseded by the bug it caught (`autotune6_q0_cbr128.csv`). Campaign 7:
-`autotune7_q0_cbr128.csv`.
+guardrails. Campaign 6: superseded by the bug it caught. Receipts:
+`tests/autotune_q0_cbr128.csv` through `autotune10_qmax128.csv`.
 
 ---
 
@@ -690,6 +724,29 @@ integer-only API was history, not format. Integral values take the legacy intege
 arithmetic verbatim (bit-identical); fractional ones refine the per-granule target in
 `calc_target_bits` in double precision. Measured: sizes strictly monotone through 191,
 191.25, 191.5, 191.75, 192. Gate 70/70.
+
+### Equal-measured-size A/B harness
+
+`tests/eqsize-abtest.ps1` finally lets VBR be judged fairly: per corpus file it bisects
+each side's rate control (fractional `-V` for VBR, the float `--abr` for ABR) until the
+measured average bitrate lands in `[target - 0.5, target]`, then scores both sides with the
+meter at matched measured size. `tools/podcast --measure` exposes the MPEG frame walker it
+depends on. Its first result was decisive: stock VBR and `--quality-max` VBR, bisected to
+matched bitrates, produce byte-identical files on every holdout track (see Finding 2). The
+flag is unwired for the modern VBR path, not mis-tuned.
+
+### Adaptive reservoir factor: tested, null
+
+The year-2000 comment in `calc_target_bits` suggests steering `res_factor` toward the
+requested ABR average "on the fly". Implemented exactly as specified (proportional control
+from the frame histogram `updateStats` already maintains, clamped to the comment's
+0.90-1.00 range), the gate confirmed perfect byte-isolation (drift in exactly the 10
+`abr192` cases), and the landing accuracy did not move: ~187-191 kbps measured for a
+192 kbps request, before and after, even with the clamp raised to 1.10. The undershoot is
+demand-limited: easy content declines its budget because the psymodel is satisfied, so no
+reservoir policy can close the gap. Reverted. The practical fix already shipped: fractional
+`--abr` requests plus measured-average bisection, which is how the podcast optimizer lands
+inside 0.5 kbps.
 
 ### CMake, CI, fuzzing, docs lint
 
@@ -796,10 +853,12 @@ look excellent right up until the material is unseen.
 | Finding 3: `--quality-max` v2 objective fix | merged at `c1034a2`; -0.944/-0.982/-0.761 dB vs v1 |
 | Finding 4: `--threads 2` | merged; bit-exact both ways; 1.54x/1.56x on quality-max 320/ABR |
 | Finding 5: portfolio search | rejected; preserved behind `-DLAME_QMAX_PORTFOLIO` |
-| Finding 6 campaign 1 | candidate, pending ABX |
-| Finding 6 campaigns 2-5 | rejected (overfit or guardrail failure), receipts committed |
+| Finding 6 campaigns 1-7 | q0-128 candidate validated + ABX'd (no audible difference); campaigns 2-5 rejected; missing-tag trap caught and fixed |
+| Finding 6 campaigns 8-10 (per-rate) | three validated opt-in configs; CBR 320 at -1.81/-2.81 dB is the project's largest gain |
 | Podcast optimizer v2 | landed; true VBR wins at equal measured bitrate |
 | Fractional ABR | landed, regress-gated |
+| Equal-measured-size harness | landed; first result: quality-max is a no-op for modern VBR |
+| Adaptive `res_factor` (year-2000 TODO) | tested, null: ABR undershoot is demand-limited; reverted |
 | CMake build | bit-identical to nmake baseline on MSVC |
 | CI + fuzz + docs lint | live and green at LynxTWO/lame_v4 |
 
@@ -807,11 +866,9 @@ look excellent right up until the material is unseen.
 
 | Item | Why it matters |
 | --- | --- |
-| Per-rate tuning campaigns (320, ABR, qmax) with the honest chain | the discipline and tooling are proven; expectations set by the q0 result (gains of this size are meter-visible, ear-invisible) |
+| Owner ABX of the CBR 320 candidate | at -1.8 to -2.8 dB it is the first tuning result large enough that audibility is a live question; needs a listening package |
+| Wire `--quality-max` into the modern VBR path | the flag is currently a no-op for `-V` encodes (`vbrquantize.c` consults none of its knobs); the largest untouched quality surface |
 | Optional: focused short-clip ABX re-tests | looped short excerpts are sharper instruments than full dense tracks if a difference verdict is ever needed on small deltas |
-| Campaign 7: rerun with the fixed measurement chain | campaigns 1-6 searched under a fitness degraded by the missing-tag trap; with correct alignment the fitness and the val veto finally measure what they claim |
-| VBR under `--quality-max` | needs an equal-measured-size methodology; equal-setting NMR cannot judge VBR fairly |
-| Adaptive bit-reservoir `res_factor` | a to-do comment from year 2000 sits in `calc_target_bits` |
 | Longer fuzz campaign | extend decoder safety coverage now that the harness is proven |
 
 ---
