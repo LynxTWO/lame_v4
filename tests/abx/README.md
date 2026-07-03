@@ -83,6 +83,18 @@ as D, and especially if you prefer it, the candidate earns consideration beyond 
 Listen for overall cleanliness; the tuning tightens bass masking slightly and spends a
 little more near the threshold of hearing.
 
+## Finding 6 per-rate - the CBR 320 candidate (the big one)
+
+`F_stock320` vs `G_tuned320` (h05, the library-holdout excerpt where the tuned config's
+audible errors improved most, -2.18 dB), and `H_stock320_lux` vs `I_tuned320_lux` (400 Lux,
+full track) as a dense second opinion. The candidate is the campaign-8 winner: bass and mid
+masking tightened hard, treble relaxed, ATH raised. Holdout receipts: -1.81 dB on SQAM,
+-2.81 dB on library tracks, audible errors quieter on every file checked, transients clean.
+
+Fair warning for calibration: 320 kbps is deeply transparent territory, so even a 2 dB
+measured improvement may be inaudible. A null here would not weaken the measured result; a
+positive would make this the first tuning change with a human-audible receipt.
+
 ## If you confirm it
 
 Finding 1 is already shipped. For Finding 3: v2 is opt-in and all objective guardrails passed,

@@ -74,6 +74,34 @@ if (Test-Path $Source) {
     Write-Host "Finding 6 pair SKIPPED (needs the Tom's Diner track)."
 }
 
+# ---- Finding 6 per-rate: CBR 320, stock vs the campaign-8 tuned candidate ----
+# The project's largest validated gain (SQAM -1.81, library -2.81 dB; audNMR improves on
+# every holdout file). Material: h05 from the library holdout, the excerpt with the largest
+# measured audible-error improvement (-2.18 dB); see tests/corpus_holdout/manifest.txt for
+# its source. Also 400 Lux full track for a dense-material second opinion.
+$W320 = @('-q','0','-b','320','--ns-bass','-8.00','--ns-alto','-8.00','--ns-treble','5.46',
+          '--ns-sfb21','4.26','--nsmsfix','1.91','--shortthreshold','5.46,31.01','--athlower','5.22')
+$h05 = "$PSScriptRoot\corpus_holdout\h05.wav"
+if (Test-Path $h05) {
+    Copy-Item $h05 (Join-Path $Out 'original_h05.wav') -Force
+    & $Lame --quiet -q 0 -b 320 $h05 (Join-Path $Out 'F_stock320.mp3') 2>&1 | Out-Null
+    & $Lame --quiet @W320 $h05 (Join-Path $Out 'G_tuned320.mp3') 2>&1 | Out-Null
+    foreach ($t in 'F_stock320', 'G_tuned320') {
+        & $Lame --quiet --decode (Join-Path $Out "$t.mp3") (Join-Path $Out "$($t)_decoded.wav") 2>&1 | Out-Null
+    }
+    Write-Host "Finding 6 per-rate pair written (h05 at CBR 320, stock vs tuned)."
+} else {
+    Write-Host "Finding 6 per-rate pair SKIPPED (needs tests/corpus_holdout/h05.wav)."
+}
+if (Test-Path $LuxSource) {
+    & $Lame --quiet -q 0 -b 320 $LuxSource (Join-Path $Out 'H_stock320_lux.mp3') 2>&1 | Out-Null
+    & $Lame --quiet @W320 $LuxSource (Join-Path $Out 'I_tuned320_lux.mp3') 2>&1 | Out-Null
+    foreach ($t in 'H_stock320_lux', 'I_tuned320_lux') {
+        & $Lame --quiet --decode (Join-Path $Out "$t.mp3") (Join-Path $Out "$($t)_decoded.wav") 2>&1 | Out-Null
+    }
+    Write-Host "Finding 6 per-rate second pair written (400 Lux at CBR 320)."
+}
+
 # ---- Finding 3: 400 Lux full track, qmax v1 vs v2 (+ default -q0 reference) ----
 if ((Test-Path $QmaxV1) -and (Test-Path $Lame) -and (Test-Path $LuxSource)) {
     Copy-Item $LuxSource (Join-Path $Out 'original_400lux.wav') -Force
