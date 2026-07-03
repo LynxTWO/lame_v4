@@ -1951,6 +1951,98 @@ calc_target_bits(lame_internal_flags * gfc,
  *  frames get that fixed budget); pass -1 for CBR.
  *
  ************************************************************************/
+/* v4 quality-max portfolio research apparatus (FINDINGS Finding 5). Compiled out by default:
+   five selection criteria -- through dual-referee masking + bit guards -- all measured worse
+   than v2 externally (+2.32 -> +0.20 dB, monotone convergence from below, never crossing 0).
+   Per-granule candidate selection leaks quality through channels invisible in-loop (post-
+   selection scfsi resizing; decoded-domain analysis windows spanning granule boundaries).
+   Kept compilable (-DLAME_QMAX_PORTFOLIO) as the starting point if a future scorer closes
+   those channels; the productive path meanwhile is END-TO-END parameter search, which the
+   external meter judges on complete encodes. */
+#ifdef LAME_QMAX_PORTFOLIO
+/************************************************************************
+ *
+ *  v4 quality-max: SECOND-REFEREE masking model (Finding 5 follow-up).
+ *
+ *  LAME's internal noise accounting (calc_noise vs l3_xmin) orders
+ *  near-neighbor candidates reliably but not structurally different ones
+ *  (Finding 5: candidates it called strictly better measured audibly
+ *  worse). This builds an INDEPENDENT masking view per (granule,channel)
+ *  in the MDCT domain, mirroring the external meter's model
+ *  (tests/nmr): per-band energy from the original spectrum, two-slope
+ *  Bark spreading (-25 dB/Bark above the masker, -10 below), -12 dB
+ *  masking offset, max over maskers. Portfolio swaps must win by BOTH
+ *  referees (and cost no extra bits), so neither model's blind spots
+ *  decide alone. Computed once per (gr,ch): xr never changes across
+ *  candidates, so scores are comparable.
+ *
+ ************************************************************************/
+static void
+calc_meter_mask(lame_internal_flags const *gfc, gr_info const *cod_info, FLOAT mask[SFBMAX])
+{
+    SessionConfig_t const *const cfg = &gfc->cfg;
+    FLOAT   eb_db[SFBMAX];
+    FLOAT   bark[SFBMAX];
+    int     sfb, j, n;
+    int     j_long = 0;         /* cumulative line index, long region (0..576) */
+    int     j_short = 0;        /* cumulative line index within ONE short window (0..192) */
+    double const hz_long = cfg->samplerate_out * 0.5 / 576.0;
+    double const hz_short = cfg->samplerate_out * 0.5 / 192.0;
+
+    n = cod_info->psymax;
+    j = 0;
+    for (sfb = 0; sfb < n; sfb++) {
+        int const width = cod_info->width[sfb];
+        double  en = 0, f, z;
+        int     l;
+        for (l = 0; l < width; l++, j++)
+            en += (double) cod_info->xr[j] * cod_info->xr[j];
+        eb_db[sfb] = (FLOAT) (10.0 * log10(en + 1e-12));
+        /* band centre frequency: long entries advance the 576-line axis; short entries come
+           in window-triples that share one 192-line-per-window axis (advance it once per
+           completed triple) */
+        if (sfb < cod_info->sfb_lmax) {
+            f = (j_long + width * 0.5) * hz_long;
+            j_long += width;
+        }
+        else {
+            f = (j_short + width * 0.5) * hz_short;
+            if (((sfb - cod_info->sfb_lmax) % 3) == 2)
+                j_short += width;
+        }
+        z = 13.0 * atan(0.00076 * f) + 3.5 * atan((f / 7500.0) * (f / 7500.0));
+        bark[sfb] = (FLOAT) z;
+    }
+    for (sfb = 0; sfb < n; sfb++) {
+        double  best = -1e30;
+        int     k;
+        for (k = 0; k < n; k++) {
+            double const dz = bark[sfb] - bark[k];
+            double const slope = dz >= 0 ? -25.0 * dz : 10.0 * dz;
+            double const contrib = eb_db[k] + slope;
+            if (contrib > best)
+                best = contrib;
+        }
+        mask[sfb] = (FLOAT) pow(10.0, (best - 12.0) / 10.0);
+    }
+}
+
+/* Aggregate noise-to-mask of a FINISHED candidate against the second referee's mask.
+   calc_noise's distort[] is noise/l3_xmin, so noise = distort * l3_xmin; lower is better. */
+static FLOAT
+meter_score(gr_info const *cod_info, FLOAT const *distort, FLOAT const *l3_xmin,
+            FLOAT const *mask)
+{
+    FLOAT   sum = 0;
+    int     sfb;
+    for (sfb = 0; sfb < cod_info->psymax; sfb++) {
+        double const noise = (double) distort[sfb] * l3_xmin[sfb];
+        sum += (FLOAT) log10(Max(noise / (mask[sfb] + 1e-30), 1e-20));
+    }
+    return sum;
+}
+#endif /* LAME_QMAX_PORTFOLIO */
+
 static int
 quantize_gr_ch_once(lame_internal_flags * gfc, const III_psy_ratio ratio[2][2],
                     int gr, int ch, int targ_bits_ch, int analog_silence_bits,
@@ -1984,20 +2076,69 @@ quantize_gr_ch(lame_internal_flags * gfc, const III_psy_ratio ratio[2][2],
     gr_info *const cod_info = &gfc->l3_side.tt[gr][ch];
     FLOAT   l3_xmin[SFBMAX];
 
-    /* NOTE (quality-max "v3" post-mortem, FINDINGS Finding 5): a portfolio search was built
-       here -- run the complete search once per shaping strategy via cod_info->qmax_shaping,
-       isolate the per-channel bin_search state per run, keep the best finished candidate --
-       and its harness was verified exact (a strategy-3-only portfolio is byte-identical to
-       v2). It was then REMOVED because every selection criterion tried made real corpus
-       audio measurably WORSE on the independent meter: tot_noise-only +1.9 dB (reservoir
-       drain), noise+bits Pareto dominance +0.5 dB, full dominance on over_count, over_noise,
-       tot_noise AND bits still +0.45 dB. Candidates from structurally different trajectories
-       that LAME's own noise accounting calls strictly better are audibly worse: the internal
-       l3_xmin-based objective only orders NEAR-NEIGHBOR candidates reliably. Deeper search
-       is blocked on a higher-fidelity in-loop objective, not on more searching. The
-       qmax_shaping override plumbing stays (inert -- 0 everywhere) for that future work. */
+#ifdef LAME_QMAX_PORTFOLIO
+    if (cfg->quality_max && (cfg->vbr == vbr_off || cfg->vbr == vbr_abr)) {
+        /* v4 quality-max v3: PORTFOLIO SEARCH with DUAL-REFEREE selection (Finding 5 and its
+           follow-up). Run the complete search once per shaping strategy (3 = coarse+refine,
+           the v2 default, first so ties keep v2's result; then 0/1/2) and let a challenger
+           displace the incumbent only when it wins by BOTH masking models AND costs no extra
+           bits:
+             - internal referee: tot_noise vs LAME's l3_xmin (the search's own objective),
+             - second referee: meter_score vs the independent Bark-spread mask (above),
+             - bits: part2_3_length <= incumbent's, so the reservoir v2 leaves for hard
+               frames downstream can only end fuller (single-referee/noise-only selection
+               measured +0.45..+2.3 dB WORSE; see FINDINGS Finding 5 for the full table).
+           bin_search's adaptive CurrentStep/OldValue state is isolated per run and the
+           winning run's state is carried forward: a portfolio whose incumbent never loses
+           is byte-identical to v2, file-wide. Deterministic; identical with --threads. */
+        static const int strategies[] = { 3, 0, 1, 2 };
+        gr_info best_info;
+        FLOAT   meter_mask[SFBMAX];
+        FLOAT   best_tot = 0, best_meter = 0;
+        int     have_best = 0, k;
+        int const save_step = gfc->sv_qnt.CurrentStep[ch];
+        int const save_old = gfc->sv_qnt.OldValue[ch];
+        int     best_step = save_step, best_old = save_old;
+
+        calc_meter_mask(gfc, cod_info, meter_mask);
+
+        for (k = 0; k < (int) (sizeof(strategies) / sizeof(strategies[0])); k++) {
+            calc_noise_result nr;
+            FLOAT   distort[SFBMAX];
+            FLOAT   ms;
+
+            gfc->sv_qnt.CurrentStep[ch] = save_step;
+            gfc->sv_qnt.OldValue[ch] = save_old;
+            cod_info->qmax_shaping = 1 + strategies[k];
+            if (!quantize_gr_ch_once(gfc, ratio, gr, ch, targ_bits_ch, analog_silence_bits,
+                                     l3_xmin))
+                break;  /* analog silence: strategy-independent, current state is the result */
+            (void) calc_noise(cod_info, l3_xmin, distort, &nr, 0);
+            ms = meter_score(cod_info, distort, l3_xmin, meter_mask);
+            if (!have_best
+                || (ms < best_meter && nr.tot_noise <= best_tot
+                    && cod_info->part2_3_length <= best_info.part2_3_length)) {
+                best_tot = nr.tot_noise;
+                best_meter = ms;
+                best_info = *cod_info;
+                best_step = gfc->sv_qnt.CurrentStep[ch];
+                best_old = gfc->sv_qnt.OldValue[ch];
+                have_best = 1;
+            }
+        }
+        if (have_best) {
+            *cod_info = best_info;
+            gfc->sv_qnt.CurrentStep[ch] = best_step;
+            gfc->sv_qnt.OldValue[ch] = best_old;
+        }
+        cod_info->qmax_shaping = 0;
+        return;
+    }
+#endif /* LAME_QMAX_PORTFOLIO */
+
     (void) quantize_gr_ch_once(gfc, ratio, gr, ch, targ_bits_ch, analog_silence_bits, l3_xmin);
     (void) cfg;
+    (void) cod_info;
 }
 
 

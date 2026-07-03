@@ -347,20 +347,29 @@ of cross-strategy selection, not bugs.
 | fewest unmasked bands, then tot_noise | **+2.32 dB** | re-introduces the Finding 3 minimax pathology: worst-band strategies win `over_count` while wrecking aggregate noise |
 | tot_noise only (the search's own objective) | **+1.93 dB** | locally greedy, globally destructive: cheaper strategies win the granule by spending its whole bit budget, draining the reservoir that v2 leaves for hard frames downstream |
 | full Pareto dominance (`over_count` ∧ `over_noise` ∧ `tot_noise` ∧ bits, ≥1 strict) | **+0.45 dB** | swaps that *every internal metric calls unambiguous upgrades* still measure worse on the independent meter |
+| **dual referee**: strictly better by an independent in-loop Bark-spread mask (the external meter's model rebuilt in the MDCT domain) ∧ tot_noise ≤ ∧ bits ≤ | **+0.20 dB** | even swaps endorsed by two masking models at no bit cost leak quality through channels invisible at selection time |
 
-**The relocated frontier (engineer):** LAME's `calc_noise`-vs-`l3_xmin` accounting orders
-*near-neighbor* candidates reliably — that is why within-trajectory search (Findings 1–3)
-kept winning. Across structurally different candidates (different scalefactor vectors, gains,
-scalefac_scale), its judgment does not transfer: sub-threshold margin differences and masking-
-model mismatch dominate the comparison. Any deeper search — portfolio, trellis, exhaustive —
-is therefore **blocked on objective fidelity, not compute**. The next real quality lever is a
-higher-fidelity in-loop candidate scorer (e.g. a Bark-domain NMR in the decoded domain,
-importing the external meter's model), after which the already-built portfolio harness (the
-`qmax_shaping` plumbing stays in the tree, inert) becomes immediately useful again.
+**The convergence tells the story:** +2.32 → +1.93 → +0.45 → +0.20, monotone from below,
+never crossing zero. The last two leak channels are structural, not fixable by better
+scoring: (a) a swap changes the scalefactor structure, which changes cross-granule `scfsi`
+compression *after* selection — the bit guard sees pre-finish sizes; (b) the external meter
+measures decoded PCM whose analysis windows span granule boundaries, so reconstruction
+interactions between neighboring granules are invisible to any per-granule in-loop score.
 
-**Status:** portfolio removed; `--quality-max` output verified byte-identical to v2 with the
-scaffolding in place; bit-exact gates 70/70 with and without `--threads 2`. Cost of the
-portfolio for reference: ~3× v2 (66 s vs 22 s on the ABX track at CBR128), threads-identical.
+**Conclusion (engineer):** v2's `amp=3` trajectory is at or near the achievable optimum for
+the candidate class the portfolio generates, and **per-granule candidate selection is
+structurally leaky** — LAME's internal accounting orders near-neighbor candidates (why
+Findings 1–3 kept winning) but no in-loop referee, however good, can see scfsi resizing and
+cross-boundary decode effects. Deeper-search research should therefore go through
+**end-to-end evaluation**: change a *global* parameter, encode *completely*, measure with
+the external meter — an architecture immune to this failure mode (the meter-driven
+auto-tuning campaign in the roadmap). The entire portfolio apparatus — strategy override,
+state isolation, second-referee mask — stays in the tree behind `-DLAME_QMAX_PORTFOLIO`,
+verified byte-identical to v2 when compiled out.
+
+**Status:** portfolio compiled out by default; `--quality-max` output verified byte-identical
+to v2; bit-exact gates 70/70 with and without `--threads 2`. Cost of the portfolio for
+reference: ~3× v2 (66 s vs 22 s on the ABX track at CBR128), threads-identical.
 
 ### Finding 0 (minor): re-enabling the in-loop Huffman search (`best_huffman = 2`)
 
@@ -463,9 +472,20 @@ result to `output/lame_fix.exe`, `git checkout master && build.cmd`, copy to
 - [x] **Finding 5: portfolio search ("v3") — measured dead end.** Deeper search is blocked on
       the fidelity of the in-loop objective, not compute (see the finding). Harness verified
       exact and kept inert in-tree.
-- [ ] **The relocated frontier: a higher-fidelity in-loop candidate scorer** (Bark-domain NMR
-      in the decoded domain, importing the external meter's model into candidate selection) —
-      unlocks portfolio/trellis search afterwards.
+- [x] **Second-referee in-loop scorer — built and measured (Finding 5 follow-up):** the
+      external meter's Bark model rebuilt in the MDCT domain as an independent in-loop
+      referee. Dual-referee selection cut the portfolio regression to +0.20 dB but never
+      crossed zero: per-granule selection is structurally leaky (scfsi resizing after
+      selection; decode windows spanning granule boundaries). Apparatus preserved behind
+      `-DLAME_QMAX_PORTFOLIO`.
+- [ ] **The frontier that survives Finding 5: meter-driven end-to-end auto-tuning.** LAME's
+      hand-tuned 2002 constants (`mask_adjust`, `msfix`, ATH offsets, short-block thresholds…)
+      searched with complete encodes scored by the external meter — immune to per-granule
+      selection leaks. Needs train/holdout discipline (tune on one corpus half, validate on
+      SQAM holdout + transient metrics + ABX) to avoid overfitting our own meter.
+- [ ] Quality-max for VBR via the equal-measured-size methodology (the podcast tool's `-V`
+      bisection provides the harness); the adaptive bit-reservoir `res_factor` TODO from
+      2000 (`calc_target_bits` comment) is a candidate first target.
 - [ ] Longer fuzz campaign locally / oss-fuzz-style now that the harness is proven in CI.
 
 ---
