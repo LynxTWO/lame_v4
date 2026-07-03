@@ -73,6 +73,14 @@ audible artifact anywhere, it's here. The flagged spot is the bass-heavy onset a
 3. If any spot in B sounds *worse* than A, note the timestamp — that's the worst-band
    trade-off surfacing, and exactly what this package exists to catch.
 
+## Finding 6 — the auto-tuned psymodel constants (bonus pair)
+
+`D_stockq0_b128` vs `E_autotuned_b128` (Tom's Diner, full track, CBR128): the machine-tuned
+masking constants from the auto-tuning campaign (holdout-validated −0.183 dB on SQAM,
+−0.236 dB on full tracks; transients clean). If E sounds at least as good as D — and
+especially if you *prefer* it — the candidate earns consideration beyond opt-in. Listen for
+overall cleanliness vs any treble character change (the tuning relaxes treble masking).
+
 ## If you confirm it
 
 Finding 1 is already shipped. For Finding 3: v2 is opt-in and all objective guardrails passed,

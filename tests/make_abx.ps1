@@ -58,6 +58,22 @@ if ((Test-Path $Stock) -and (Test-Path $Fixed) -and (Test-Path $Source)) {
     Write-Host "Finding 1 SKIPPED (needs $Stock, $Fixed and the Tom's Diner track)."
 }
 
+# ---- Finding 6: Tom's Diner full track, stock -q0 CBR128 vs the auto-tuned candidate ----
+# Campaign-1 winner (holdout-validated: -0.183 dB SQAM, -0.236 dB full tracks; see FINDINGS).
+if (Test-Path $Source) {
+    $tuned = @('-q','0','-b','128','--ns-bass','0.57','--ns-alto','2.37','--ns-treble','4.00',
+               '--ns-sfb21','2.89','--nsmsfix','0.63','--shortthreshold','5.92,33.63')
+    Copy-Item $Source (Join-Path $Out 'original_diner_full.wav') -Force
+    & $Lame --quiet -q 0 -b 128 $Source (Join-Path $Out 'D_stockq0_b128.mp3') 2>&1 | Out-Null
+    & $Lame --quiet @tuned $Source (Join-Path $Out 'E_autotuned_b128.mp3') 2>&1 | Out-Null
+    foreach ($t in 'D_stockq0_b128', 'E_autotuned_b128') {
+        & $Lame --quiet --decode (Join-Path $Out "$t.mp3") (Join-Path $Out "$($t)_decoded.wav") 2>&1 | Out-Null
+    }
+    Write-Host "Finding 6 pair written (Tom's Diner full track, stock vs auto-tuned)."
+} else {
+    Write-Host "Finding 6 pair SKIPPED (needs the Tom's Diner track)."
+}
+
 # ---- Finding 3: 400 Lux full track, qmax v1 vs v2 (+ default -q0 reference) ----
 if ((Test-Path $QmaxV1) -and (Test-Path $Lame) -and (Test-Path $LuxSource)) {
     Copy-Item $LuxSource (Join-Path $Out 'original_400lux.wav') -Force
