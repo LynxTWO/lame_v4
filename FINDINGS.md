@@ -323,6 +323,45 @@ help, but CBR's granule-1 bit targets depend on granule 0's reservoir accounting
 (~39% at default settings) — parallelizing psymodel/MDCT needs its own shared-state audit
 (the psymodel couples channels through mid/side spectra and loudness).
 
+### Finding 5: the portfolio search (quality-max "v3") — a measured dead end that relocates the frontier
+
+**Layman:** we tried making `--quality-max` search even harder: run the whole quantization
+search four times per audio chunk — once under each of LAME's bit-allocation strategies — and
+keep whichever result LAME's own accounting scores best. Every variant of "keep the best"
+made real music *measurably worse*. The lesson isn't that deeper search is useless — it's
+that **LAME's internal judge can't referee candidates that differ structurally**. Until the
+encoder gets a higher-fidelity way to score its own candidates, more searching cannot help.
+
+**What was built (and verified exact before being judged):** a per-(granule,channel)
+strategy override (`gr_info.qmax_shaping`) so one search run can use any of the four shaping
+strategies; per-run isolation of the adaptive `bin_search` state (`CurrentStep`/`OldValue`),
+with the winning run's state carried forward; full re-derivation per run from untouched
+`xr`. **Floor test: a portfolio restricted to strategy 3 is byte-identical to v2** across a
+full real track — the harness itself was exact, so the regressions below are real properties
+of cross-strategy selection, not bugs.
+
+**Three selection criteria, all measured worse than v2 (4-file real-music subset, CBR128):**
+
+| Selection rule | corpus mean vs v2 | failure mechanism |
+| --- | --- | --- |
+| fewest unmasked bands, then tot_noise | **+2.32 dB** | re-introduces the Finding 3 minimax pathology: worst-band strategies win `over_count` while wrecking aggregate noise |
+| tot_noise only (the search's own objective) | **+1.93 dB** | locally greedy, globally destructive: cheaper strategies win the granule by spending its whole bit budget, draining the reservoir that v2 leaves for hard frames downstream |
+| full Pareto dominance (`over_count` ∧ `over_noise` ∧ `tot_noise` ∧ bits, ≥1 strict) | **+0.45 dB** | swaps that *every internal metric calls unambiguous upgrades* still measure worse on the independent meter |
+
+**The relocated frontier (engineer):** LAME's `calc_noise`-vs-`l3_xmin` accounting orders
+*near-neighbor* candidates reliably — that is why within-trajectory search (Findings 1–3)
+kept winning. Across structurally different candidates (different scalefactor vectors, gains,
+scalefac_scale), its judgment does not transfer: sub-threshold margin differences and masking-
+model mismatch dominate the comparison. Any deeper search — portfolio, trellis, exhaustive —
+is therefore **blocked on objective fidelity, not compute**. The next real quality lever is a
+higher-fidelity in-loop candidate scorer (e.g. a Bark-domain NMR in the decoded domain,
+importing the external meter's model), after which the already-built portfolio harness (the
+`qmax_shaping` plumbing stays in the tree, inert) becomes immediately useful again.
+
+**Status:** portfolio removed; `--quality-max` output verified byte-identical to v2 with the
+scaffolding in place; bit-exact gates 70/70 with and without `--threads 2`. Cost of the
+portfolio for reference: ~3× v2 (66 s vs 22 s on the ABX track at CBR128), threads-identical.
+
 ### Finding 0 (minor): re-enabling the in-loop Huffman search (`best_huffman = 2`)
 
 **Layman:** `-q0` turns off one of its own thorough sub-searches purely to save time (its own
@@ -414,11 +453,20 @@ result to `output/lame_fix.exe`, `git checkout master && build.cmd`, copy to
       runner-built baseline, with the committed dev baseline as an informational toolchain
       drift detector; Linux job builds with gcc and runs `tests/smoke.sh` (every reference
       setting encodes+decodes + perceptual self-check + bitrate monotonicity); fuzz job runs
-      the mpglib/hip decoder under libFuzzer+ASan for 60 s per push. Inert until the repo has
-      a GitHub remote.
-- [ ] Longer fuzz campaign locally / oss-fuzz-style once the harness proves itself in CI.
-- [ ] Analysis-front (psymodel/MDCT) parallelism audit — that's where encode time is; its
-      channel coupling (mid/side, loudness) needs its own shared-state audit first.
+      the mpglib/hip decoder under libFuzzer+ASan for 60 s per push. **Live and fully green
+      at https://github.com/LynxTWO/lame_v4** — first runs caught a real 25-year-old
+      portability bug (stdint macros vs modern glibc) and proved the meter bit-deterministic
+      cross-platform. First fuzz campaign: 60 s, zero crashes.
+- [x] Analysis-front (psymodel/MDCT) parallelism audit (`docs/analysis-front-audit.md`) —
+      channel-parallel is feasible but worth only ~1.2× at default settings; ABR worker
+      dispatch frame-batched as the audit's follow-up (1.56×, hash-identical).
+- [x] **Finding 5: portfolio search ("v3") — measured dead end.** Deeper search is blocked on
+      the fidelity of the in-loop objective, not compute (see the finding). Harness verified
+      exact and kept inert in-tree.
+- [ ] **The relocated frontier: a higher-fidelity in-loop candidate scorer** (Bark-domain NMR
+      in the decoded domain, importing the external meter's model into candidate selection) —
+      unlocks portfolio/trellis search afterwards.
+- [ ] Longer fuzz campaign locally / oss-fuzz-style now that the harness is proven in CI.
 
 ---
 

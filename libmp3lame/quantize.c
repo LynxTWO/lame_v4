@@ -720,6 +720,15 @@ quant_compare(const int quant_comp,
  *
  *
  *************************************************************************/
+/* v4 quality-max v3: the effective shaping strategy for one search run. The portfolio search
+   in quantize_gr_ch re-runs the whole search under each strategy via cod_info->qmax_shaping;
+   everything else (all non-qmax paths, VBR, defaults) reads the session config as always. */
+inline static int
+shaping_amp(SessionConfig_t const *cfg, gr_info const *gi)
+{
+    return gi->qmax_shaping ? gi->qmax_shaping - 1 : cfg->noise_shaping_amp;
+}
+
 static void
 amp_scalefac_bands(lame_internal_flags * gfc,
                    gr_info * const cod_info, FLOAT const *distort, FLOAT xrpow[576], int bRefine)
@@ -743,7 +752,7 @@ amp_scalefac_bands(lame_internal_flags * gfc,
             trigger = distort[sfb];
     }
 
-    noise_shaping_amp = cfg->noise_shaping_amp;
+    noise_shaping_amp = shaping_amp(cfg, cod_info);
     if (noise_shaping_amp == 3) {
         if (bRefine == 1)
             noise_shaping_amp = 2;
@@ -783,7 +792,7 @@ amp_scalefac_bands(lame_internal_flags * gfc,
 
         if (gfc->sv_qnt.substep_shaping & 2) {
             gfc->sv_qnt.pseudohalf[sfb] = !gfc->sv_qnt.pseudohalf[sfb];
-            if (!gfc->sv_qnt.pseudohalf[sfb] && cfg->noise_shaping_amp == 2)
+            if (!gfc->sv_qnt.pseudohalf[sfb] && shaping_amp(cfg, cod_info) == 2)
                 return;
         }
         cod_info->scalefac[sfb]++;
@@ -793,7 +802,10 @@ amp_scalefac_bands(lame_internal_flags * gfc,
                 cod_info->xrpow_max = xrpow[j + l];
         }
 
-        if (cfg->noise_shaping_amp == 2)
+        /* NB: the raw amp (not the bRefine-mapped local) -- historically amp=3's refine pass
+           amplifies ALL bands at the trigger, unlike true amp=2's one-band-and-return. The
+           override must reproduce that quirk exactly. */
+        if (shaping_amp(cfg, cod_info) == 2)
             return;
     }
 }
@@ -1159,9 +1171,9 @@ outer_loop(lame_internal_flags * gfc, gr_info * const cod_info, const FLOAT * co
                 if (cfg->full_outer_loop == 0) {
                     if (++age > search_limit && best_noise_info.over_count == 0)
                         break;
-                    if ((cfg->noise_shaping_amp == 3) && bRefine && age > 30)
+                    if ((shaping_amp(cfg, cod_info) == 3) && bRefine && age > 30)
                         break;
-                    if ((cfg->noise_shaping_amp == 3) && bRefine &&
+                    if ((shaping_amp(cfg, cod_info) == 3) && bRefine &&
                         (cod_info_w.global_gain - best_ggain_pass1) > 15)
                         break;
                 }
@@ -1169,7 +1181,7 @@ outer_loop(lame_internal_flags * gfc, gr_info * const cod_info, const FLOAT * co
         }
         while ((cod_info_w.global_gain + cod_info_w.scalefac_scale) < 255);
 
-        if (cfg->noise_shaping_amp == 3) {
+        if (shaping_amp(cfg, cod_info) == 3) {
             if (!bRefine) {
                 /* refine search */
                 cod_info_w = *cod_info;
@@ -1939,11 +1951,11 @@ calc_target_bits(lame_internal_flags * gfc,
  *  frames get that fixed budget); pass -1 for CBR.
  *
  ************************************************************************/
-static void
-quantize_gr_ch(lame_internal_flags * gfc, const III_psy_ratio ratio[2][2],
-               int gr, int ch, int targ_bits_ch, int analog_silence_bits)
+static int
+quantize_gr_ch_once(lame_internal_flags * gfc, const III_psy_ratio ratio[2][2],
+                    int gr, int ch, int targ_bits_ch, int analog_silence_bits,
+                    FLOAT l3_xmin[SFBMAX])
 {
-    FLOAT   l3_xmin[SFBMAX];
     FLOAT   xrpow[576];
     gr_info *const cod_info = &gfc->l3_side.tt[gr][ch];
 
@@ -1959,7 +1971,33 @@ quantize_gr_ch(lame_internal_flags * gfc, const III_psy_ratio ratio[2][2],
         if (analog_silence_bits >= 0 && 0 == ath_over) /* ABR: analog silence */
             targ_bits_ch = analog_silence_bits;
         (void) outer_loop(gfc, cod_info, l3_xmin, xrpow, ch, targ_bits_ch);
+        return 1;
     }
+    return 0;           /* analog silence: l3_enc zeroed, nothing to search */
+}
+
+static void
+quantize_gr_ch(lame_internal_flags * gfc, const III_psy_ratio ratio[2][2],
+               int gr, int ch, int targ_bits_ch, int analog_silence_bits)
+{
+    SessionConfig_t const *const cfg = &gfc->cfg;
+    gr_info *const cod_info = &gfc->l3_side.tt[gr][ch];
+    FLOAT   l3_xmin[SFBMAX];
+
+    /* NOTE (quality-max "v3" post-mortem, FINDINGS Finding 5): a portfolio search was built
+       here -- run the complete search once per shaping strategy via cod_info->qmax_shaping,
+       isolate the per-channel bin_search state per run, keep the best finished candidate --
+       and its harness was verified exact (a strategy-3-only portfolio is byte-identical to
+       v2). It was then REMOVED because every selection criterion tried made real corpus
+       audio measurably WORSE on the independent meter: tot_noise-only +1.9 dB (reservoir
+       drain), noise+bits Pareto dominance +0.5 dB, full dominance on over_count, over_noise,
+       tot_noise AND bits still +0.45 dB. Candidates from structurally different trajectories
+       that LAME's own noise accounting calls strictly better are audibly worse: the internal
+       l3_xmin-based objective only orders NEAR-NEIGHBOR candidates reliably. Deeper search
+       is blocked on a higher-fidelity in-loop objective, not on more searching. The
+       qmax_shaping override plumbing stays (inert -- 0 everywhere) for that future work. */
+    (void) quantize_gr_ch_once(gfc, ratio, gr, ch, targ_bits_ch, analog_silence_bits, l3_xmin);
+    (void) cfg;
 }
 
 

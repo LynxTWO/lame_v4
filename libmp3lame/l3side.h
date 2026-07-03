@@ -81,6 +81,11 @@ typedef struct {
 
     int     max_nonzero_coeff;
     char    energy_above_cutoff[SFBMAX];
+    int     qmax_shaping;    /* v4 quality-max v3 portfolio search: 0 = use the session's
+                                noise_shaping_amp (calloc default, all non-qmax paths);
+                                else (strategy + 1) overrides it for THIS granule+channel's
+                                current search run. Per-gr_info so channel workers can run
+                                different strategies concurrently without shared state. */
 } gr_info;
 
 typedef struct {

@@ -25,6 +25,7 @@ CMakeFiles/
 # The ** matters: corpus subfolders (SQAM/) hold copyrighted EBU material that must never land
 # in the repo.
 /tests/corpus/**/*.wav
+/tests/corpus*/
 /tests/out/
 /tests/out*/
 
