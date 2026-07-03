@@ -75,11 +75,13 @@ audible artifact anywhere, it's here. The flagged spot is the bass-heavy onset a
 
 ## Finding 6 - the auto-tuned psymodel constants (bonus pair)
 
-`D_stockq0_b128` vs `E_autotuned_b128` (Tom's Diner, full track, CBR128): the machine-tuned
-masking constants from the auto-tuning campaign (holdout-validated -0.183 dB on SQAM,
--0.236 dB on full tracks; transients clean). If E sounds at least as good as D - and
-especially if you *prefer* it - the candidate earns consideration beyond opt-in. Listen for
-overall cleanliness vs any treble character change (the tuning relaxes treble masking).
+`D_stockq0_b128` vs `E_autotuned_b128` (Tom's Diner, full track, CBR128): the campaign-7
+winner, `--ns-bass -2.50 --athlower 1.50`. Two knobs, found under the corrected measurement
+chain, holdout-validated (-0.121 dB SQAM, -0.217 dB library tracks), audibility-flat per
+file, and the cleanest transient profile of any config tested. If E sounds at least as good
+as D, and especially if you prefer it, the candidate earns consideration beyond opt-in.
+Listen for overall cleanliness; the tuning tightens bass masking slightly and spends a
+little more near the threshold of hearing.
 
 ## If you confirm it
 

@@ -59,10 +59,10 @@ if ((Test-Path $Stock) -and (Test-Path $Fixed) -and (Test-Path $Source)) {
 }
 
 # ---- Finding 6: Tom's Diner full track, stock -q0 CBR128 vs the auto-tuned candidate ----
-# Campaign-1 winner (holdout-validated: -0.183 dB SQAM, -0.236 dB full tracks; see FINDINGS).
+# Campaign-7 winner (honest measurement chain; holdout-validated -0.121 dB SQAM, -0.217 dB
+# library; audibility-flat per file; cleanest transient profile tested; see FINDINGS).
 if (Test-Path $Source) {
-    $tuned = @('-q','0','-b','128','--ns-bass','0.57','--ns-alto','2.37','--ns-treble','4.00',
-               '--ns-sfb21','2.89','--nsmsfix','0.63','--shortthreshold','5.92,33.63')
+    $tuned = @('-q','0','-b','128','--ns-bass','-2.50','--athlower','1.50')
     Copy-Item $Source (Join-Path $Out 'original_diner_full.wav') -Force
     & $Lame --quiet -q 0 -b 128 $Source (Join-Path $Out 'D_stockq0_b128.mp3') 2>&1 | Out-Null
     & $Lame --quiet @tuned $Source (Join-Path $Out 'E_autotuned_b128.mp3') 2>&1 | Out-Null

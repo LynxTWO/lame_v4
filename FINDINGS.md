@@ -565,14 +565,43 @@ degraded; every holdout and guardrail number in this finding is unaffected, beca
 `-t` from the tool's measurement chain; campaign 7 reruns the search with a meaningful
 fitness and a veto that can actually fire.
 
+#### Campaign 7. The honest chain produces the real candidate.
+
+With the fixed measurement chain, the search behaved differently from the first phase on.
+The corrected baseline reads -5.8511 (the old +12.0172 was offset artifact), and all 256
+random configs lost to stock: with a fitness that measures what it claims, the wide space
+holds nothing better than the 2002 tuning at random. The refinement phase then found small,
+real, incremental gains around the baseline, and the live veto verified every incumbent
+(worst val-file audNMR delta +0.106, inside the +0.5 cap).
+
+The winner is two knobs, no bound-riding:
+
+```text
+--ns-bass -2.50 --athlower 1.50
+```
+
+Holdouts and gates, lower is better:
+
+| Check | Result |
+| --- | --- |
+| train fitness | -0.147 dB |
+| SQAM holdout (70 files) | -0.121 dB |
+| library holdout (16 fresh tracks) | -0.217 dB |
+| audNMR on holdout music | +0.04 to +0.11 dB per file (flat) |
+| transients | cleanest profile of any config tested: castanets better on both metrics, everything else within 0.03-0.33 dB |
+
+The same audNMR gate, applied uniformly, demotes the campaign-1 winner: it makes audible
+errors +0.5 to +1.2 dB louder per file on holdout music, a milder version of the exact
+mechanism that disqualified campaigns 3 and 5. Its larger holdout means were partly bought
+the same way. It is no longer a candidate.
+
 #### Status
 
-Campaign-1 winner: candidate, pending ABX (found under the degraded fitness, but validated
-entirely by correctly measured holdouts, so its receipts stand). Campaigns 2 through 5:
-rejected on correctly measured holdouts and guardrails; receipts in
+**Campaign-7 winner (`--ns-bass -2.50 --athlower 1.50`): the sole candidate, pending ABX**
+(the D-vs-E pair in `tests/abx/` points at it). Campaign-1 winner: demoted, receipts above.
+Campaigns 2 through 5: rejected on holdouts and guardrails; receipts in
 `tests/autotune_q0_cbr128.csv` through `autotune5_q0_cbr128.csv`. Campaign 6: superseded by
-the bug it caught (`autotune6_q0_cbr128.csv`). Campaign 7 (fixed measurement chain):
-pending.
+the bug it caught (`autotune6_q0_cbr128.csv`). Campaign 7: `autotune7_q0_cbr128.csv`.
 
 ---
 
