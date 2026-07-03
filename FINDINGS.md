@@ -320,13 +320,30 @@ benchmark had assigned its encode settings to PowerShell's reserved `$args` vari
 every measurement ran at default settings (section 2.5). Stage instrumentation settled it:
 the ~22 s figure was right.
 
+#### Human ABX (2026-07-03)
+
+The owner ran the adversarial pair blind: v1 vs v2, full 400 Lux track at CBR 128, the one
+file where v2's worst band-frame rose ~4 dB. Result: **9/16, p = 0.40**. No audible
+difference demonstrated on this material for this listener.
+
+That answers the safety question in v2's favor: the worst-band trade produced no detectable
+regression on the track chosen to expose it. It also bounds the win: unlike Finding 1's fix
+(15/16, clearly audible), the v1-to-v2 gain is below this blind threshold on dense
+electronic material. Sighted impressions before the test favored v2 (a better-defined bass
+shift at 15.7 s; a cleaner inverse-sum residual in iZotope RX, corroborated by windowed
+meter readings of -7.05 vs -6.00 there), and did not survive blinding. The owner's own
+summary of why: "my brain would trick me and hear the same passage in different ways." That
+is what ABX is for.
+
 #### Status
 
 Merged (`c1034a2`). Scoped to CBR/ABR like Finding 1; the objective override lives in
 `lame_init_params` after the `cfg->quant_comp` copy, because an earlier write gets
-clobbered. VBR keeps stock objectives until an equal-size methodology exists. A
-reproduction note: cross-build LTCG floating-point wobble makes absolute corpus means drift
-by ~0.02 dB between binaries; all decisions here used same-binary deltas.
+clobbered. VBR keeps stock objectives until an equal-size methodology exists. ABX on the
+adversarial track: no audible regression, no audible difference (log in `tests/abx/`). The
+mode's case rests on the corpus-wide measurements. A reproduction note: cross-build LTCG
+floating-point wobble makes absolute corpus means drift by ~0.02 dB between binaries; all
+decisions here used same-binary deltas.
 
 ---
 
@@ -768,8 +785,8 @@ look excellent right up until the material is unseen.
 
 | Item | Why it matters |
 | --- | --- |
-| Owner ABX: `--quality-max` v2 (400 Lux pair) | the one guardrail nuance (worst band-frame +4 dB on that track) needs ears |
-| Owner ABX: campaign-1 tuning candidate (D vs E pair) | required before the candidate can be considered beyond opt-in |
+| Owner ABX: campaign-7 tuning candidate (D vs E pair, Tom's Diner) | required before the candidate can be considered beyond opt-in; sparse vocal material is far easier to focus on than 400 Lux was |
+| Optional: focused short-clip re-test of qmax v2 | a looped 15-19 s bass excerpt would be a sharper instrument than the full dense track if a difference verdict is ever needed |
 | Campaign 7: rerun with the fixed measurement chain | campaigns 1-6 searched under a fitness degraded by the missing-tag trap; with correct alignment the fitness and the val veto finally measure what they claim |
 | VBR under `--quality-max` | needs an equal-measured-size methodology; equal-setting NMR cannot judge VBR fairly |
 | Adaptive bit-reservoir `res_factor` | a to-do comment from year 2000 sits in `calc_target_bits` |
