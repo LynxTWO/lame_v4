@@ -43,6 +43,16 @@ static class Program
 
     static int Main(string[] rawArgs)
     {
+        // Utility mode: print an MP3's measured average audio-frame bitrate and exit.
+        // Reuses the frame walker; the equal-size A/B harness (tests/eqsize-abtest.ps1)
+        // depends on it to land candidates at matched measured bitrates.
+        if (rawArgs.Length == 2 && rawArgs[0] == "--measure")
+        {
+            double k = AudioFrameKbps(rawArgs[1]);
+            Console.WriteLine(k.ToString("F3", CultureInfo.InvariantCulture));
+            return k > 0 ? 0 : 1;
+        }
+
         var args = new List<string>(rawArgs);
         string input = null, output = null;
         string preset = "podcast-stereo";
