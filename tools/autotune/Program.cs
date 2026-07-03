@@ -35,17 +35,23 @@ static class Program
         public double Lo, Hi;      // search range
         public double Def;         // LAME default = "absent from command line"
         public bool IsPair;        // shortthreshold takes "x,y"; we scale both from one factor
+        public bool IsBool;        // rounds to 0/1; only emitted when it rounds away from Def
     }
 
-    // Ranges are deliberately conservative: +/- a few dB of masking adjust, the documented
-    // 0..3.5 for nsmsfix, and a 0.5..2x factor on the short-block thresholds (4.4 / 25).
+    // Campaign 2 ranges: the ns-* clamp in parse.c is (int)(x*4) in [-32,31], i.e. +/-8 dB in
+    // 0.25 dB steps -- search the full representable range (campaign 1's winner rode its +/-4
+    // bound). interch was dropped: measured dead under the 3.100 psymodel. athlower is
+    // content-dependent (only bites near the threshold in quiet); temporal-masking is boolean
+    // (default on).
     static readonly Knob[] Knobs = {
-        new Knob { Name = "ns-bass",   Lo = -4, Hi = 4, Def = 0 },
-        new Knob { Name = "ns-alto",   Lo = -4, Hi = 4, Def = 0 },
-        new Knob { Name = "ns-treble", Lo = -4, Hi = 4, Def = 0 },
-        new Knob { Name = "ns-sfb21",  Lo = -4, Hi = 4, Def = 0 },
+        new Knob { Name = "ns-bass",   Lo = -8, Hi = 8, Def = 0 },
+        new Knob { Name = "ns-alto",   Lo = -8, Hi = 8, Def = 0 },
+        new Knob { Name = "ns-treble", Lo = -8, Hi = 8, Def = 0 },
+        new Knob { Name = "ns-sfb21",  Lo = -8, Hi = 8, Def = 0 },
         new Knob { Name = "nsmsfix",   Lo = 0.5, Hi = 3.5, Def = -1 },  // -1 = absent
         new Knob { Name = "shortfactor", Lo = 0.5, Hi = 2.0, Def = 1, IsPair = true },
+        new Knob { Name = "temporal-masking", Lo = 0, Hi = 1, Def = 1, IsBool = true },
+        new Knob { Name = "athlower",  Lo = -6, Hi = 6, Def = 0 },
     };
 
     static string lamePath, nmrPath, setting;
@@ -146,6 +152,13 @@ static class Program
         for (int d = 0; d < Knobs.Length; d++)
         {
             var k = Knobs[d];
+            if (k.IsBool)
+            {
+                int v = x[d] >= 0.5 ? 1 : 0;
+                if (v != (int) k.Def)
+                    parts.Add("--" + k.Name + " " + v);
+                continue;
+            }
             if (Math.Abs(x[d] - k.Def) < 1e-9) continue;   // default = leave absent
             if (k.IsPair)
             {

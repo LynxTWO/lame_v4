@@ -411,12 +411,24 @@ attack-heavy tracks (sample20 better on both metrics), slight HF dulling on two 
 expected face of the treble trade the meter endorses overall.
 
 **Caveats and scope (engineer):** found at `-q0` CBR128; transfer to other rates/modes
-unmeasured. `ns-treble` rides its +4 search bound — the next campaign should widen bounds
-(and add knobs: `--interch`, `--temporal-masking`, ATH shaping). The full config list is
-committed (`tests/autotune_q0_cbr128.csv`). **This is an opt-in candidate, not a default
-change** — a default retune needs ABX confirmation and per-mode campaigns. And the standing
-circularity guard applies: the meter picked these constants, so human ears are the final
-arbiter (the holdout + transient checks are what make it a candidate at all).
+unmeasured. The full config list is committed (`tests/autotune_q0_cbr128.csv`). **This is an
+opt-in candidate, not a default change** — a default retune needs ABX confirmation and
+per-mode campaigns. And the standing circularity guard applies: the meter picked these
+constants, so human ears are the final arbiter (the holdout + transient checks are what make
+it a candidate at all).
+
+**Campaign 2 — the overfitting boundary, measured.** Because campaign 1's winner rode its
+±4 dB bound, campaign 2 searched the full representable range (±8 dB, 8 knobs — adding the
+temporal-masking toggle and `athlower`; `--interch` measured dead under the 3.100 psymodel
+and was dropped), 353 configs. Train result looked spectacular: −0.212 dB, with an extreme
+config (bass/alto/treble pinned at −8/+8/−8 — treble *sign-flipped* vs campaign 1 — temporal
+masking off, ATH raised). **Holdout verdict: +1.44 dB worse on SQAM, +2.03 dB worse on
+full-length tracks.** Textbook memorization: at ±8 the search stops finding perceptual truth
+and starts exploiting train-set/meter idiosyncrasies; the conservative bounds *were* the
+regularization. The overfitting boundary for this space and train-set size sits between ±4
+and ±8. Campaign 1's winner stands as the validated candidate; wider searches need more
+training material (more real music) and/or an explicit prior toward defaults before they can
+be trusted. (`tests/autotune2_q0_cbr128.csv` preserves all 353 configs.)
 
 ### Finding 0 (minor): re-enabling the in-loop Huffman search (`best_huffman = 2`)
 
@@ -531,9 +543,12 @@ result to `output/lame_fix.exe`, `git checkout master && build.cmd`, copy to
       with complete encodes (`tools/autotune`), and the winner **generalizes: −0.183 dB on
       the untouched SQAM holdout, −0.236 dB on full-length tracks** (train showed only
       −0.055). Transients clean. Opt-in candidate at `-q0` CBR128; ABX pending.
-- [ ] Auto-tuning campaign 2: widen bounds (`ns-treble` rode its +4 limit), add knobs
-      (`--interch`, `--temporal-masking`, ATH shaping), per-rate campaigns (320/ABR/qmax),
-      and an ABX package for the winner before any default consideration.
+- [x] Auto-tuning campaign 2 (full ±8 range, 8 knobs, 353 configs): **the overfitting
+      boundary, measured** — train −0.212 dB but holdout +1.44/+2.03 dB WORSE. The ±4 bounds
+      were the regularization; campaign 1's winner stands as the validated candidate.
+- [ ] Campaign 3 prerequisites: more real-music training material (rip more CDs) and/or an
+      explicit prior toward defaults; per-rate campaigns (320/ABR/qmax); ABX package for the
+      campaign-1 winner before any default consideration.
 - [ ] Quality-max for VBR via the equal-measured-size methodology (the podcast tool's `-V`
       bisection provides the harness); the adaptive bit-reservoir `res_factor` TODO from
       2000 (`calc_target_bits` comment) is a candidate first target.
