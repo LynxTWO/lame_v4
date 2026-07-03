@@ -58,6 +58,18 @@ static class Program
     static string[] trainWavs;
     static int jobs;
 
+    // Campaign-4/5 fitness: minimizing mean NMR alone is exploitable -- campaign 3's winner
+    // generalized on the mean while nearly doubling the loudness of the errors that stayed
+    // audible on MUSIC (audNMR 5.2 -> 9.0) and trashing transient treble. A train-MEAN audNMR
+    // constraint (campaign 4) never fired: the synthetic torture files' huge audNMR drowns a
+    // music-only regression (Simpson's paradox inside the fitness). So the constraint is
+    // PER FILE: any file whose audible-band loudness (nmr field 3) rises more than AUD_TOL
+    // above ITS OWN all-defaults baseline adds a heavy penalty. Configs must win by making
+    // noise less audible -- on every file -- not by making remaining audible noise louder.
+    const double AUD_TOL = 0.10;
+    const double AUD_LAMBDA = 10.0;
+    static double[] baselineAudPerFile;
+
     static int Main(string[] args)
     {
         string train = null, outCsv = "autotune_results.csv";
@@ -182,7 +194,8 @@ static class Program
                 results.Add((configs[i], scores[i]));
     }
 
-    // Mean meanNMRdb over the train corpus for one config; NaN on any failure.
+    // Fitness over the train corpus for one config (see AUD_LAMBDA note); NaN on any failure.
+    // On the very first call (all-defaults baseline) this also records baselineAud.
     static double Evaluate(double[] x)
     {
         string dir = Path.Combine(Path.GetTempPath(), "autotune_" + Guid.NewGuid().ToString("N").Substring(0, 8));
@@ -190,9 +203,12 @@ static class Program
         try
         {
             string extra = ArgsFor(x);
-            double sum = 0;
-            foreach (var wav in trainWavs)
+            bool isBaseline = baselineAudPerFile == null;
+            var audNow = isBaseline ? new double[trainWavs.Length] : null;
+            double sum = 0, penalty = 0;
+            for (int i = 0; i < trainWavs.Length; i++)
             {
+                var wav = trainWavs[i];
                 string mp3 = Path.Combine(dir, "c.mp3"), dec = Path.Combine(dir, "c.wav");
                 if (!Run(lamePath, $"--quiet --nohist -t {setting} {extra} {Quote(wav)} {Quote(mp3)}"))
                     return double.NaN;
@@ -200,10 +216,17 @@ static class Program
                     return double.NaN;
                 string line = RunCapture(nmrPath, $"{Quote(wav)} {Quote(dec)}");
                 var f = (line ?? "").Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-                if (f.Length < 1) return double.NaN;
+                if (f.Length < 3) return double.NaN;
                 sum += double.Parse(f[0], CultureInfo.InvariantCulture);
+                double aud = double.Parse(f[2], CultureInfo.InvariantCulture); // audibleNMRdb
+                if (isBaseline)
+                    audNow[i] = aud;
+                else
+                    penalty += Math.Max(0.0, aud - (baselineAudPerFile[i] + AUD_TOL));
             }
-            return sum / trainWavs.Length;
+            double mean = sum / trainWavs.Length;
+            if (isBaseline) { baselineAudPerFile = audNow; return mean; }
+            return mean + AUD_LAMBDA * penalty / trainWavs.Length;
         }
         finally
         {

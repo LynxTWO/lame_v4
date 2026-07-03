@@ -435,6 +435,24 @@ volume to the fitness function itself.** Campaign 4 must optimize a multi-metric
 scorer can do by reading all four meter fields plus the transient tool. (Campaign 3's 353
 configs: `tests/autotune3_q0_cbr128.csv`.)
 
+**Campaigns 4–5 — the constraint doesn't transfer; the trade looks structural.** Campaign 4
+added an audNMR penalty to the fitness (audible errors must not get louder than stock) as a
+*train-set mean* — it never fired: the synthetic torture files' huge audNMR drowns a
+music-only regression (Simpson's paradox inside the fitness). Campaign 5 made it **per-file**
+(no individual training file may exceed its own stock audNMR by >0.1 dB, λ=10). The search
+then produced a *different* winner with even better holdout means (−0.612 SQAM, −1.377
+library) that **satisfied the constraint on train and failed it on holdout in the identical
+way** (music audNMR 5.2 → ~9.0; Tom's Diner transient HF 0.67 → 6.06). Two independent
+configs, same unseen-music pathology: at these masking swings, large mean-NMR gains at
+CBR128 appear inseparable from redistributing audibility into fewer-but-louder errors, and
+train-side constraints relocate the exploit rather than remove it. **Both rejected. The
+campaign-1 winner (modest, three-holdout-validated, transient-clean) remains the only
+candidate.** Next escalations, in order of promise: a validation-split veto inside the search
+loop, transient-HF terms in the fitness, tol=0/λ=100 to see if *any* mean gain survives a
+hard audibility ceiling — or accept that conservative bounds are the deployable regime and
+spend the compute on per-rate campaigns instead. (`tests/autotune4_q0_cbr128.csv`,
+`autotune5_…`.)
+
 **Campaign 2 — the overfitting boundary, measured.** Because campaign 1's winner rode its
 ±4 dB bound, campaign 2 searched the full representable range (±8 dB, 8 knobs — adding the
 temporal-masking toggle and `athlower`; `--interch` measured dead under the 3.100 psymodel
@@ -569,9 +587,14 @@ result to `output/lame_fix.exe`, `git checkout master && build.cmd`, copy to
       the guardrails caught the deeper Goodhart**: transient HF explodes, audible errors get
       fewer-but-louder (audNMR 5.2→9.0). Rejected. Campaign-1 winner passed its THIRD holdout
       (−0.355 on fresh library tracks) and stays the sole candidate.
-- [ ] Campaign 4: **multi-metric fitness** — mean NMR constrained by audNMR, transient-HF and
-      pre-echo inside the autotune scorer; per-rate campaigns (320/ABR/qmax); ABX for the
-      campaign-1 winner before any default consideration.
+- [x] Campaigns 4–5: audNMR-constrained fitness (train-mean, then per-file). **The constraint
+      holds on train and fails to transfer**: a different winner with even better holdout
+      means (−0.612/−1.377) reproduced the identical fewer-but-louder pathology on unseen
+      music. Both rejected; the trade looks structural at wide masking bounds.
+- [ ] Campaign 6 options (in order of promise): validation-split veto inside the search;
+      transient-HF fitness terms; hard audibility ceiling (tol=0, λ=100); or bank the
+      conservative regime and run per-rate campaigns (320/ABR/qmax) at ±4-style bounds.
+- [ ] ABX for the campaign-1 winner (D-vs-E pair ready) before any default consideration.
 - [ ] Quality-max for VBR via the equal-measured-size methodology (the podcast tool's `-V`
       bisection provides the harness); the adaptive bit-reservoir `res_factor` TODO from
       2000 (`calc_target_bits` comment) is a candidate first target.
