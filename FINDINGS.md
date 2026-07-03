@@ -371,6 +371,53 @@ verified byte-identical to v2 when compiled out.
 to v2; bit-exact gates 70/70 with and without `--threads 2`. Cost of the portfolio for
 reference: ~3× v2 (66 s vs 22 s on the ABX track at CBR128), threads-identical.
 
+### Finding 6: meter-driven auto-tuning — the psymodel's hand-tuned constants CAN be beaten
+
+**Layman:** LAME's psychoacoustic model has half a dozen tuning constants that were set by
+human listening tests around 2002 — and, it turns out, the command-line knobs for them have
+been **compile-locked off in every normal build ever since** (they parsed but silently did
+nothing). We unlocked them, had the machine search thousands of complete encodes scored by
+our independent meter, and validated the best settings on material the search never saw. The
+result is a small but real, generalizing improvement — found by measurement where 2002 could
+only listen.
+
+**The dead-knob trap (worth its own paragraph):** the first 177-config campaign returned
+"stock is optimal — every challenger identical". The §2e discipline (pair every gate with
+proof the code path engaged) caught it: all six knobs produced byte-identical output because
+`--ns-bass/-alto/-treble/-sfb21`, `--nsmsfix` and `--shortthreshold` are gated behind
+`_ALLOW_INTERNAL_OPTIONS`, which no shipped build defines. The v4 build now defines it
+(frontend-only; option-free encodes stay bit-exact, gate-verified 70/70). Consequence: this
+tuning surface has likely **never been systematically explored with an objective metric**.
+
+**Method (`tools/autotune`):** 6-dimensional search (masking adjust per region ±4 dB, M/S
+tuning 0.5–3.5, short-block thresholds ×0.5–2), 128 random configs + 2 coordinate-refinement
+rounds, each config = a complete encode of the TRAIN set (30 s music excerpts + synthetics)
+scored by mean `meanNMRdb`; 32 configs evaluated in parallel; deterministic seed. SQAM and
+the full-length tracks were **held out** of the search entirely.
+
+**Result (at `-q0` CBR128):** winner `--ns-bass 0.57 --ns-alto 2.37 --ns-treble 4.00
+--ns-sfb21 2.89 --nsmsfix 0.63 --shortthreshold 5.92,33.63` — i.e. relax mid/treble masking,
+soften M/S switching, demand stronger attacks before short blocks.
+
+| Set | vs stock `-q0` CBR128 |
+| --- | --- |
+| train (13 files, what the search saw) | −0.055 dB |
+| **SQAM holdout (70 files, never seen)** | **−0.183 dB** |
+| **full-length corpus holdout** | **−0.236 dB** |
+
+Generalizes *better* than it trained — the opposite of overfitting. Transient check (the
+raised short threshold was the pre-echo risk): sub-dB and split on pre-echo across four
+attack-heavy tracks (sample20 better on both metrics), slight HF dulling on two tracks — the
+expected face of the treble trade the meter endorses overall.
+
+**Caveats and scope (engineer):** found at `-q0` CBR128; transfer to other rates/modes
+unmeasured. `ns-treble` rides its +4 search bound — the next campaign should widen bounds
+(and add knobs: `--interch`, `--temporal-masking`, ATH shaping). The full config list is
+committed (`tests/autotune_q0_cbr128.csv`). **This is an opt-in candidate, not a default
+change** — a default retune needs ABX confirmation and per-mode campaigns. And the standing
+circularity guard applies: the meter picked these constants, so human ears are the final
+arbiter (the holdout + transient checks are what make it a candidate at all).
+
 ### Finding 0 (minor): re-enabling the in-loop Huffman search (`best_huffman = 2`)
 
 **Layman:** `-q0` turns off one of its own thorough sub-searches purely to save time (its own
@@ -478,11 +525,15 @@ result to `output/lame_fix.exe`, `git checkout master && build.cmd`, copy to
       crossed zero: per-granule selection is structurally leaky (scfsi resizing after
       selection; decode windows spanning granule boundaries). Apparatus preserved behind
       `-DLAME_QMAX_PORTFOLIO`.
-- [ ] **The frontier that survives Finding 5: meter-driven end-to-end auto-tuning.** LAME's
-      hand-tuned 2002 constants (`mask_adjust`, `msfix`, ATH offsets, short-block thresholds…)
-      searched with complete encodes scored by the external meter — immune to per-granule
-      selection leaks. Needs train/holdout discipline (tune on one corpus half, validate on
-      SQAM holdout + transient metrics + ABX) to avoid overfitting our own meter.
+- [x] **Finding 6: meter-driven auto-tuning works.** Unlocked the compile-gated research
+      knobs (`_ALLOW_INTERNAL_OPTIONS` — dead in every shipped build, caught by the §2e
+      discipline when campaign 1's 177 configs came back identical), searched 6 dimensions
+      with complete encodes (`tools/autotune`), and the winner **generalizes: −0.183 dB on
+      the untouched SQAM holdout, −0.236 dB on full-length tracks** (train showed only
+      −0.055). Transients clean. Opt-in candidate at `-q0` CBR128; ABX pending.
+- [ ] Auto-tuning campaign 2: widen bounds (`ns-treble` rode its +4 limit), add knobs
+      (`--interch`, `--temporal-masking`, ATH shaping), per-rate campaigns (320/ABR/qmax),
+      and an ABX package for the winner before any default consideration.
 - [ ] Quality-max for VBR via the equal-measured-size methodology (the podcast tool's `-V`
       bisection provides the harness); the adaptive bit-reservoir `res_factor` TODO from
       2000 (`calc_target_bits` comment) is a candidate first target.

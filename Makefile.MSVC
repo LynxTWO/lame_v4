@@ -432,8 +432,11 @@ LN_OPTS = $(LN_OPTS) /LTCG
 
 
 
+# v4: /D_ALLOW_INTERNAL_OPTIONS unlocks the frontend's research options (--ns-*, --nsmsfix,
+# --shortthreshold ...); without it they parse but are silently ignored. Frontend-only --
+# encodes that do not pass those options stay bit-exact (regress-gate verified).
 CC_SWITCHES = $(CC_OPTS) $(SNDFILE_OPTS) \
-              $(GTK_OPTS) /DBS_FORMAT=BINARY
+              $(GTK_OPTS) /DBS_FORMAT=BINARY /D_ALLOW_INTERNAL_OPTIONS
 
 LN_SWITCHES = $(LN_OPTS)
 

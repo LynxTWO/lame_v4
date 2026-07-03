@@ -79,6 +79,11 @@ set(LAME_DEFS
     FLOAT8=float
     REAL_IS_FLOAT=1
     BS_FORMAT=BINARY
+    # v4: unlock the frontend's "internal" research options (--ns-bass/-alto/-treble/-sfb21,
+    # --nsmsfix, --shortthreshold ...) -- without this they parse but are silently ignored,
+    # which turned an entire auto-tuning campaign into a no-op (all 177 configs identical).
+    # Frontend-only; encodes that don't pass these options are bit-exact (gate-verified).
+    _ALLOW_INTERNAL_OPTIONS
 )
 if(MSVC)
     list(APPEND LAME_DEFS Win64)
