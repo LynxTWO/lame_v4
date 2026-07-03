@@ -612,13 +612,35 @@ errors +0.5 to +1.2 dB louder per file on holdout music, a milder version of the
 mechanism that disqualified campaigns 3 and 5. Its larger holdout means were partly bought
 the same way. It is no longer a candidate.
 
+#### Human ABX (2026-07-03)
+
+The owner ran the D-vs-E pair blind: stock `-q0` vs the campaign-7 winner, full Tom's Diner
+track at CBR 128. Result: **7/16, p = 0.77**. No audible difference demonstrated.
+
+Read both ways: no audible harm from the retune, and no audible benefit either. At this
+delta size (-0.12 to -0.22 dB on holdouts) that is the expected outcome; Finding 1's fix
+measured roughly three times larger on the same clip and hit 15/16. The candidate stays
+opt-in on meter evidence alone, and by this project's own rules that is not enough for a
+default change.
+
+#### What the tuning program concluded
+
+Seven campaigns end with a clear shape. The 2002 constants are near-optimal: honest random
+search across the whole unlocked space loses to stock. The best safe, transferring,
+audibility-flat improvement found is ~0.15 to 0.22 dB, and that size is below a careful
+listener's blind threshold. Meter-visible, ear-invisible. The program's real dividends were
+the discipline it forced into existence: the holdout methodology, the audibility gates, the
+veto, and the two tooling traps it caught (dead knobs, missing tag). Per-rate campaigns can
+reuse all of it, with expectations set accordingly.
+
 #### Status
 
-**Campaign-7 winner (`--ns-bass -2.50 --athlower 1.50`): the sole candidate, pending ABX**
-(the D-vs-E pair in `tests/abx/` points at it). Campaign-1 winner: demoted, receipts above.
-Campaigns 2 through 5: rejected on holdouts and guardrails; receipts in
-`tests/autotune_q0_cbr128.csv` through `autotune5_q0_cbr128.csv`. Campaign 6: superseded by
-the bug it caught (`autotune6_q0_cbr128.csv`). Campaign 7: `autotune7_q0_cbr128.csv`.
+Campaign-7 winner (`--ns-bass -2.50 --athlower 1.50`): validated opt-in configuration,
+ABX-tested (no audible difference; log in `tests/abx/`). Not a default change.
+Campaign-1 winner: demoted, receipts above. Campaigns 2 through 5: rejected on holdouts and
+guardrails; receipts in `tests/autotune_q0_cbr128.csv` through `autotune5_q0_cbr128.csv`.
+Campaign 6: superseded by the bug it caught (`autotune6_q0_cbr128.csv`). Campaign 7:
+`autotune7_q0_cbr128.csv`.
 
 ---
 
@@ -785,8 +807,8 @@ look excellent right up until the material is unseen.
 
 | Item | Why it matters |
 | --- | --- |
-| Owner ABX: campaign-7 tuning candidate (D vs E pair, Tom's Diner) | required before the candidate can be considered beyond opt-in; sparse vocal material is far easier to focus on than 400 Lux was |
-| Optional: focused short-clip re-test of qmax v2 | a looped 15-19 s bass excerpt would be a sharper instrument than the full dense track if a difference verdict is ever needed |
+| Per-rate tuning campaigns (320, ABR, qmax) with the honest chain | the discipline and tooling are proven; expectations set by the q0 result (gains of this size are meter-visible, ear-invisible) |
+| Optional: focused short-clip ABX re-tests | looped short excerpts are sharper instruments than full dense tracks if a difference verdict is ever needed on small deltas |
 | Campaign 7: rerun with the fixed measurement chain | campaigns 1-6 searched under a fitness degraded by the missing-tag trap; with correct alignment the fitness and the val veto finally measure what they claim |
 | VBR under `--quality-max` | needs an equal-measured-size methodology; equal-setting NMR cannot judge VBR fairly |
 | Adaptive bit-reservoir `res_factor` | a to-do comment from year 2000 sits in `calc_target_bits` |
