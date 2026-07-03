@@ -80,11 +80,12 @@ cleaner, and identical audio should measure transparent.
 | Self-identity | any file vs itself ~ -100 dB, zero audible bands |
 | Cross-platform determinism | -59.0308 reproduced to four decimals on Windows and Linux |
 
-Two honest limits, both discovered by the CI smoke test: mostly-silent files bottom out at
-the meter's epsilon-vs-tiny-mask floor (~ -59 dB even for self-comparison), and synthetic
-torture signals are not bitrate-monotone per file (castanets, pink noise, and tone mixes
-measure about equal at 128 and 320 kbps because they are pre-echo or tonality limited, not
-bit-starved). Monotonicity is a real-music property.
+One honest limit, discovered by the CI smoke test: mostly-silent files bottom out at the
+meter's epsilon-vs-tiny-mask floor (~ -59 dB even for self-comparison), so identity checks
+must use dense material. An earlier version of this section claimed synthetic torture
+signals were not bitrate-monotone; that was wrong, and the mechanism is in the pitfalls
+table below. With correctly tag-aligned decodes, the synthetics are strongly monotone too
+(music_mix -3.49 at 128 vs -15.25 at 320; pink noise -2.40 vs -14.74).
 
 ### 2.3 A/B harness
 
@@ -129,10 +130,15 @@ in any ad-hoc benchmark.
 | PowerShell automatic variables | `$a`/`$A` alias each other; `$args` is reserved, so assigning encode settings to it makes the splat expand to nothing and every "variant" runs at defaults | use distinct names (`$encArgs`, `$mA`, `$mB`) |
 | CPU contention | timing runs taken while corpus validations run in the background are garbage | time on an idle machine; sanity-check totals against stage instrumentation |
 | Trivially green gates | a parity pass only proves something if the feature actually engaged; dead code passes everything | pair every gate with a measurement that shows the code path ran |
+| Missing info tag (`-t`) before the meter | without the LAME tag the decoder cannot strip encoder delay/padding; decoded audio is misaligned and the meter reads ~+14 dB of pure offset artifact with audible fraction ~1.0 | encodes that feed `nmr` must keep the tag; `-t` stays correct only in the hash-comparing bit-exact gate |
 
 The `$args` trap corrupted an entire benchmark round. It briefly convinced us that
-`--quality-max` was cost-neutral and that threading was useless. Both corrections are
-recorded in the findings below.
+`--quality-max` was cost-neutral and that threading was useless. The missing-tag trap was
+worse: it silently degraded the fitness signal of auto-tuning campaigns 1 through 6, blinded
+their audibility constraints, and produced the false "synthetics are not monotone" claim.
+It was caught when the campaign-6 veto passed a config whose holdout audNMR was known bad,
+and a direct per-file measurement disagreed with the tool. All corrections are recorded in
+the findings below.
 
 ---
 
@@ -538,18 +544,35 @@ gains at CBR 128 appear inseparable from redistributing audibility into fewer-bu
 errors, and train-side constraints relocate the exploit rather than remove it. Both
 rejected.
 
-#### Campaign 6. Validation-split veto. In progress.
+#### Campaign 6. The validation-split veto that could not fail, and the bug it exposed.
 
-The next escalation moves the transfer test inside the loop: a validation split of fresh
+The next escalation moved the transfer test inside the loop: a validation split of 12 fresh
 library tracks that the fitness never optimizes, where a candidate must keep every file's
 audNMR within +0.5 dB of stock (and the mean within +0.1) before it can become the
-incumbent or the winner. Built into `tools/autotune` (`--val`); the first run is pending.
+incumbent or the winner (`tools/autotune --val`).
+
+The run passed every vet and crowned campaign 5's already-rejected winner. That was
+impossible: a direct per-file measurement showed that config exceeding the cap on all 12
+val tracks by +3.3 to +3.9 dB. The contradiction led to the missing-tag trap (section 2.5):
+the tool's encodes carried `-t`, so every fitness and veto measurement since campaign 1 ran
+on misaligned decodes. The internal audNMR baselines read ~14.8 where correctly aligned
+values sit near 5, which is why the constraints of campaigns 4 and 5 had so little grip and
+the veto saw nothing.
+
+Scope of the damage, stated precisely: campaign fitness signals and in-loop constraints were
+degraded; every holdout and guardrail number in this finding is unaffected, because
+`abtest.ps1`, `validate_qmax.ps1`, and the transient meter never used `-t`. The fix removes
+`-t` from the tool's measurement chain; campaign 7 reruns the search with a meaningful
+fitness and a veto that can actually fire.
 
 #### Status
 
-Campaign-1 winner: candidate, pending ABX. Campaigns 2 through 5: rejected, receipts in
-`tests/autotune_q0_cbr128.csv` through `autotune5_q0_cbr128.csv` (all 1,589 evaluated
-configs preserved). Campaign 6: pending.
+Campaign-1 winner: candidate, pending ABX (found under the degraded fitness, but validated
+entirely by correctly measured holdouts, so its receipts stand). Campaigns 2 through 5:
+rejected on correctly measured holdouts and guardrails; receipts in
+`tests/autotune_q0_cbr128.csv` through `autotune5_q0_cbr128.csv`. Campaign 6: superseded by
+the bug it caught (`autotune6_q0_cbr128.csv`). Campaign 7 (fixed measurement chain):
+pending.
 
 ---
 
@@ -718,7 +741,7 @@ look excellent right up until the material is unseen.
 | --- | --- |
 | Owner ABX: `--quality-max` v2 (400 Lux pair) | the one guardrail nuance (worst band-frame +4 dB on that track) needs ears |
 | Owner ABX: campaign-1 tuning candidate (D vs E pair) | required before the candidate can be considered beyond opt-in |
-| Campaign 6: validation-split veto | tests whether any wide-bounds gain can transfer honestly |
+| Campaign 7: rerun with the fixed measurement chain | campaigns 1-6 searched under a fitness degraded by the missing-tag trap; with correct alignment the fitness and the val veto finally measure what they claim |
 | VBR under `--quality-max` | needs an equal-measured-size methodology; equal-setting NMR cannot judge VBR fairly |
 | Adaptive bit-reservoir `res_factor` | a to-do comment from year 2000 sits in `calc_target_bits` |
 | Longer fuzz campaign | extend decoder safety coverage now that the harness is proven |

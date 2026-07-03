@@ -233,7 +233,12 @@ static class Program
             for (int i = 0; i < wavs.Length; i++)
             {
                 string mp3 = Path.Combine(dir, "c.mp3"), dec = Path.Combine(dir, "c.wav");
-                if (!Run(lamePath, $"--quiet --nohist -t {setting} {extra} {Quote(wavs[i])} {Quote(mp3)}"))
+                // No -t here: without the LAME info tag the decoder cannot strip encoder
+                // delay/padding, alignment fails, and the meter reads +14 dB of pure offset
+                // artifact (audFrac ~1.0). That bug silently degraded the fitness of
+                // campaigns 1-6 and blinded the audNMR constraints and the val veto.
+                // (-t stays correct in regress.ps1, which compares hashes, not audio.)
+                if (!Run(lamePath, $"--quiet --nohist {setting} {extra} {Quote(wavs[i])} {Quote(mp3)}"))
                     return false;
                 if (!Run(lamePath, $"--quiet --decode {Quote(mp3)} {Quote(dec)}"))
                     return false;
@@ -285,15 +290,26 @@ static class Program
         if (vetCache.TryGetValue(key, out bool cached))
             return cached;
         bool pass = false;
+        double vMean = double.NaN;
+        int worst = -1;
+        double worstDelta = double.NegativeInfinity;
         if (EvaluateOn(valWavs, x, out _, out double[] vaud))
         {
-            pass = vaud.Average() <= baselineValAudMean + VAL_MEAN_TOL;
-            for (int i = 0; pass && i < vaud.Length; i++)
-                if (vaud[i] > baselineValAud[i] + VAL_FILE_TOL)
+            vMean = vaud.Average();
+            pass = vMean <= baselineValAudMean + VAL_MEAN_TOL;
+            for (int i = 0; i < vaud.Length; i++)
+            {
+                double d = vaud[i] - baselineValAud[i];
+                if (d > worstDelta) { worstDelta = d; worst = i; }
+                if (d > VAL_FILE_TOL)
                     pass = false;
+            }
         }
         vetCache[key] = pass;
-        Console.WriteLine($"   vet {(pass ? "PASS" : "reject")}: {(key == "" ? "(baseline)" : key)}");
+        Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
+            "   vet {0}: valAud {1:F3} (base {2:F3}), worst file +{3:F3} [{4}]: {5}",
+            pass ? "PASS" : "reject", vMean, baselineValAudMean, worstDelta, worst,
+            key == "" ? "(baseline)" : key));
         return pass;
     }
 
