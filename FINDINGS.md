@@ -417,6 +417,24 @@ per-mode campaigns. And the standing circularity guard applies: the meter picked
 constants, so human ears are the final arbiter (the holdout + transient checks are what make
 it a candidate at all).
 
+**Campaign 3 — more data moves the boundary, and exposes the next one.** With the owner's CD
+library available, the train set grew to 36 files (27 real-music excerpts across genres, with
+a fresh 16-track library holdout that never enters any search; provenance manifests kept).
+First, the campaign-1 winner passed its **third** independent holdout: **−0.355 dB** on the
+16 fresh tracks (its margins grow with realer material: −0.183 SQAM → −0.236 full tracks →
+−0.355 library). Then the full ±8 search was repeated on the big train set: its winner
+**generalized on the mean** (−0.418 SQAM, −1.052 library — data was what made campaign 2
+memorize) **but failed the guardrails**: transient HF error explodes on real music (Tom's
+Diner 0.67→3.38, 400 Lux 1.98→9.97 — `ns-treble +8` lets the encoder trash treble at
+attacks), and while the audible *fraction* drops (0.32→0.28), the remaining audible errors
+nearly **double in loudness** (audNMR 5.2→9.0): many-mild-errors traded for fewer-but-blatant
+ones. The scalar mean rewards that trade; ears will not. **Verdict: rejected — the campaign-1
+winner stays the only candidate, and the frontier moves again: from search bounds and data
+volume to the fitness function itself.** Campaign 4 must optimize a multi-metric objective
+(mean NMR with audNMR/transient-HF/pre-echo constraints built in), which `tools/autotune`'s
+scorer can do by reading all four meter fields plus the transient tool. (Campaign 3's 353
+configs: `tests/autotune3_q0_cbr128.csv`.)
+
 **Campaign 2 — the overfitting boundary, measured.** Because campaign 1's winner rode its
 ±4 dB bound, campaign 2 searched the full representable range (±8 dB, 8 knobs — adding the
 temporal-masking toggle and `athlower`; `--interch` measured dead under the 3.100 psymodel
@@ -546,8 +564,13 @@ result to `output/lame_fix.exe`, `git checkout master && build.cmd`, copy to
 - [x] Auto-tuning campaign 2 (full ±8 range, 8 knobs, 353 configs): **the overfitting
       boundary, measured** — train −0.212 dB but holdout +1.44/+2.03 dB WORSE. The ±4 bounds
       were the regularization; campaign 1's winner stands as the validated candidate.
-- [ ] Campaign 3 prerequisites: more real-music training material (rip more CDs) and/or an
-      explicit prior toward defaults; per-rate campaigns (320/ABR/qmax); ABX package for the
+- [x] Campaign 3 (36-file train from the owner's library, fresh 16-track holdout): **data
+      moved the mean-generalization boundary** (±8 winner: −0.418 SQAM, −1.052 library) **but
+      the guardrails caught the deeper Goodhart**: transient HF explodes, audible errors get
+      fewer-but-louder (audNMR 5.2→9.0). Rejected. Campaign-1 winner passed its THIRD holdout
+      (−0.355 on fresh library tracks) and stays the sole candidate.
+- [ ] Campaign 4: **multi-metric fitness** — mean NMR constrained by audNMR, transient-HF and
+      pre-echo inside the autotune scorer; per-rate campaigns (320/ABR/qmax); ABX for the
       campaign-1 winner before any default consideration.
 - [ ] Quality-max for VBR via the equal-measured-size methodology (the podcast tool's `-V`
       bisection provides the harness); the adaptive bit-reservoir `res_factor` TODO from
