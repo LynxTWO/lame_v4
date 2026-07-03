@@ -64,6 +64,8 @@ jobs:
           cmake --build build -j
       - name: "Smoke: all settings encode+decode + perceptual sanity"
         run: bash tests/smoke.sh build/lame
+      - name: "Docs lint: no typographic Unicode in Markdown"
+        run: bash tests/lint-docs.sh
 
   fuzz-decoder:
     runs-on: ubuntu-latest

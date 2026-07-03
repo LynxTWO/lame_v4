@@ -70,9 +70,22 @@ static class Program
     const double AUD_LAMBDA = 10.0;
     static double[] baselineAudPerFile;
 
+    // Campaign-6 veto: train-side constraints proved satisfiable-without-transferring
+    // (campaign 5). So candidates that would become the incumbent must additionally SURVIVE
+    // a validation split the fitness never optimizes: fresh library tracks (--val dir) where
+    // no single file's audible-band loudness may rise >VAL_FILE_TOL over its stock baseline
+    // and the mean may not rise >VAL_MEAN_TOL. The final holdouts (SQAM + h-set) still never
+    // enter the loop at all.
+    const double VAL_FILE_TOL = 0.50;
+    const double VAL_MEAN_TOL = 0.10;
+    static string[] valWavs;
+    static double[] baselineValAud;
+    static double baselineValAudMean = double.NaN;
+    static readonly Dictionary<string, bool> vetCache = new Dictionary<string, bool>();
+
     static int Main(string[] args)
     {
-        string train = null, outCsv = "autotune_results.csv";
+        string train = null, valDir = null, outCsv = "autotune_results.csv";
         int nRandom = 128, nRefine = 2;
         setting = "-q 0 -b 128";
         jobs = Environment.ProcessorCount;
@@ -85,6 +98,7 @@ static class Program
             switch (args[i])
             {
                 case "--train": train = args[++i]; break;
+                case "--val": valDir = args[++i]; break;
                 case "--setting": setting = args[++i]; break;
                 case "--random": nRandom = int.Parse(args[++i], CultureInfo.InvariantCulture); break;
                 case "--refine": nRefine = int.Parse(args[++i], CultureInfo.InvariantCulture); break;
@@ -104,8 +118,13 @@ static class Program
             if (!File.Exists(p)) { Console.Error.WriteLine($"not found: {p}"); return 2; }
         trainWavs = Directory.GetFiles(train, "*.wav").OrderBy(f => f).ToArray();
         if (trainWavs.Length == 0) { Console.Error.WriteLine("no wavs in train dir"); return 2; }
+        if (valDir != null)
+        {
+            valWavs = Directory.GetFiles(valDir, "*.wav").OrderBy(f => f).ToArray();
+            if (valWavs.Length == 0) { Console.Error.WriteLine("no wavs in val dir"); return 2; }
+        }
 
-        Console.WriteLine($"train={trainWavs.Length} files  setting=\"{setting}\"  random={nRandom} refine={nRefine} jobs={jobs}");
+        Console.WriteLine($"train={trainWavs.Length} files  val={(valWavs?.Length ?? 0)}  setting=\"{setting}\"  random={nRandom} refine={nRefine} jobs={jobs}");
 
         var results = new List<(double[] x, double score)>();
 
@@ -123,10 +142,13 @@ static class Program
         EvaluateBatch(configs, results);
         Report(results, baseScore, "after random search");
 
-        // Rounds 2..: coordinate refinement around the incumbent best.
+        // Rounds 2..: coordinate refinement around the VETO-SURVIVING incumbent -- configs
+        // whose audibility profile does not transfer to the validation split can never seed
+        // a refinement, however good their train fitness (campaign 6).
+        double[] incumbent = PickIncumbent(results, baseline, 12);
         for (int r = 0; r < nRefine; r++)
         {
-            var best = results.OrderBy(t => t.score).First().x;
+            var best = incumbent;
             configs = new List<double[]>();
             for (int d = 0; d < Knobs.Length; d++)
             {
@@ -140,6 +162,7 @@ static class Program
             }
             EvaluateBatch(configs, results);
             Report(results, baseScore, $"after refinement {r + 1}");
+            incumbent = PickIncumbent(results, incumbent, 12);
         }
 
         using (var w = new StreamWriter(outCsv))
@@ -150,10 +173,12 @@ static class Program
                             + "," + s.ToString("F4", CultureInfo.InvariantCulture));
         }
         Console.WriteLine($"\nall {results.Count} configs -> {outCsv}");
-        var top = results.OrderBy(t => t.score).First();
+        double incScore = results.Where(t => ArgsFor(t.x) == ArgsFor(incumbent))
+                                 .Select(t => t.score).DefaultIfEmpty(baseScore).Min();
         Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
-            "WINNER {0:F4} dB (baseline {1:F4}, delta {2:+0.0000;-0.0000})\n  lame {3} {4}",
-            top.score, baseScore, top.score - baseScore, setting, ArgsFor(top.x)));
+            "WINNER (veto-surviving incumbent) {0:F4} dB (baseline {1:F4}, delta {2:+0.0000;-0.0000})\n  lame {3} {4}",
+            incScore, baseScore, incScore - baseScore, setting,
+            ArgsFor(incumbent) == "" ? "(baseline: nothing survived the veto)" : ArgsFor(incumbent)));
         Console.WriteLine("VALIDATE on the holdout before believing this (SQAM + full tracks + transient metrics).");
         return 0;
     }
@@ -194,44 +219,98 @@ static class Program
                 results.Add((configs[i], scores[i]));
     }
 
-    // Fitness over the train corpus for one config (see AUD_LAMBDA note); NaN on any failure.
-    // On the very first call (all-defaults baseline) this also records baselineAud.
-    static double Evaluate(double[] x)
+    // One pass over a wav set: mean meanNMRdb + per-file audibleNMRdb. False on any failure.
+    static bool EvaluateOn(string[] wavs, double[] x, out double mean, out double[] audPerFile)
     {
+        mean = double.NaN;
+        audPerFile = new double[wavs.Length];
         string dir = Path.Combine(Path.GetTempPath(), "autotune_" + Guid.NewGuid().ToString("N").Substring(0, 8));
         Directory.CreateDirectory(dir);
         try
         {
             string extra = ArgsFor(x);
-            bool isBaseline = baselineAudPerFile == null;
-            var audNow = isBaseline ? new double[trainWavs.Length] : null;
-            double sum = 0, penalty = 0;
-            for (int i = 0; i < trainWavs.Length; i++)
+            double sum = 0;
+            for (int i = 0; i < wavs.Length; i++)
             {
-                var wav = trainWavs[i];
                 string mp3 = Path.Combine(dir, "c.mp3"), dec = Path.Combine(dir, "c.wav");
-                if (!Run(lamePath, $"--quiet --nohist -t {setting} {extra} {Quote(wav)} {Quote(mp3)}"))
-                    return double.NaN;
+                if (!Run(lamePath, $"--quiet --nohist -t {setting} {extra} {Quote(wavs[i])} {Quote(mp3)}"))
+                    return false;
                 if (!Run(lamePath, $"--quiet --decode {Quote(mp3)} {Quote(dec)}"))
-                    return double.NaN;
-                string line = RunCapture(nmrPath, $"{Quote(wav)} {Quote(dec)}");
+                    return false;
+                string line = RunCapture(nmrPath, $"{Quote(wavs[i])} {Quote(dec)}");
                 var f = (line ?? "").Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-                if (f.Length < 3) return double.NaN;
+                if (f.Length < 3) return false;
                 sum += double.Parse(f[0], CultureInfo.InvariantCulture);
-                double aud = double.Parse(f[2], CultureInfo.InvariantCulture); // audibleNMRdb
-                if (isBaseline)
-                    audNow[i] = aud;
-                else
-                    penalty += Math.Max(0.0, aud - (baselineAudPerFile[i] + AUD_TOL));
+                audPerFile[i] = double.Parse(f[2], CultureInfo.InvariantCulture);
             }
-            double mean = sum / trainWavs.Length;
-            if (isBaseline) { baselineAudPerFile = audNow; return mean; }
-            return mean + AUD_LAMBDA * penalty / trainWavs.Length;
+            mean = sum / wavs.Length;
+            return true;
         }
         finally
         {
             try { Directory.Delete(dir, true); } catch { /* best effort */ }
         }
+    }
+
+    // Train fitness (campaign-5 form: mean + per-file audNMR penalty); NaN on failure.
+    // The very first call (all-defaults) records the train AND val baselines.
+    static double Evaluate(double[] x)
+    {
+        if (!EvaluateOn(trainWavs, x, out double mean, out double[] aud))
+            return double.NaN;
+        if (baselineAudPerFile == null)
+        {
+            baselineAudPerFile = aud;
+            if (valWavs != null && valWavs.Length > 0
+                && EvaluateOn(valWavs, x, out _, out double[] vaud))
+            {
+                baselineValAud = vaud;
+                baselineValAudMean = vaud.Average();
+            }
+            return mean;
+        }
+        double penalty = 0;
+        for (int i = 0; i < aud.Length; i++)
+            penalty += Math.Max(0.0, aud[i] - (baselineAudPerFile[i] + AUD_TOL));
+        return mean + AUD_LAMBDA * penalty / trainWavs.Length;
+    }
+
+    // Veto on the validation split (see VAL_* note). Passing means "the audibility profile
+    // transfers"; failing configs can never become the incumbent, however good their fitness.
+    static bool Vet(double[] x)
+    {
+        if (valWavs == null || valWavs.Length == 0 || baselineValAud == null)
+            return true;    // no val set configured: veto disabled
+        string key = ArgsFor(x);
+        if (vetCache.TryGetValue(key, out bool cached))
+            return cached;
+        bool pass = false;
+        if (EvaluateOn(valWavs, x, out _, out double[] vaud))
+        {
+            pass = vaud.Average() <= baselineValAudMean + VAL_MEAN_TOL;
+            for (int i = 0; pass && i < vaud.Length; i++)
+                if (vaud[i] > baselineValAud[i] + VAL_FILE_TOL)
+                    pass = false;
+        }
+        vetCache[key] = pass;
+        Console.WriteLine($"   vet {(pass ? "PASS" : "reject")}: {(key == "" ? "(baseline)" : key)}");
+        return pass;
+    }
+
+    // Best-by-fitness config that survives the veto; performs at most maxVets fresh vets.
+    static double[] PickIncumbent(List<(double[] x, double score)> results, double[] fallback, int maxVets)
+    {
+        int fresh = 0;
+        foreach (var (x, _) in results.OrderBy(t => t.score))
+        {
+            bool isFresh = !vetCache.ContainsKey(ArgsFor(x));
+            if (isFresh && fresh >= maxVets)
+                break;
+            if (isFresh) fresh++;
+            if (Vet(x))
+                return x;
+        }
+        return fallback;
     }
 
     static void Report(List<(double[] x, double score)> results, double baseScore, string phase)
