@@ -661,6 +661,14 @@ bits available, the more the correction is worth. At quality-max the campaign wa
 near-null, consistent with Finding 3's objective fix having already taken that mode's
 headroom.
 
+Human ABX of the CBR 320 candidate (2026-07-05/06): **9/16, p = 0.40 on both materials**,
+the h05 excerpt with the largest measured improvement and the full 400 Lux track. No
+audible difference demonstrated, as the listening package's own calibration note
+anticipated: at 320 kbps the error floor sits so far under masking that even a -2.8 dB
+measured gain is below a careful listener's blind threshold. One instructive detail from
+the logs: the 400 Lux session opened 7 correct out of 7, then regressed to chance across
+the full sixteen trials. Streaks are not results; completed trial counts are.
+
 #### Status
 
 Four validated opt-in configurations, none a default change:
@@ -866,7 +874,6 @@ look excellent right up until the material is unseen.
 
 | Item | Why it matters |
 | --- | --- |
-| Owner ABX of the CBR 320 candidate | at -1.8 to -2.8 dB it is the first tuning result large enough that audibility is a live question; needs a listening package |
 | Wire `--quality-max` into the modern VBR path | the flag is currently a no-op for `-V` encodes (`vbrquantize.c` consults none of its knobs); the largest untouched quality surface |
 | Optional: focused short-clip ABX re-tests | looped short excerpts are sharper instruments than full dense tracks if a difference verdict is ever needed on small deltas |
 | Longer fuzz campaign | extend decoder safety coverage now that the harness is proven |

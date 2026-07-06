@@ -1,0 +1,54 @@
+﻿foo_abx 2.2.3 report
+foobar2000 v2.25 preview 2025-08-26
+2026-07-06 02:28:45
+
+File A: H_stock320_lux_decoded.wav
+SHA1: 4c8679ddfc667754eb402c3eb01d7f33d2e6aeef
+File B: I_tuned320_lux_decoded.wav
+SHA1: 19c4223299e948cd84eeeef960a221f0a22bfa3d
+
+Output:
+Default : Speakers (AIR 192 6) [exclusive], 24-bit
+Crossfading: NO
+
+02:28:45 : Test started.
+02:29:34 : Test restarted.
+02:29:34 : 01/01
+02:30:32 : Test restarted.
+02:30:32 : 02/02
+02:30:56 : Test restarted.
+02:30:56 : 03/03
+02:31:09 : Test restarted.
+02:31:09 : 04/04
+02:31:51 : Test restarted.
+02:31:51 : 05/05
+02:32:21 : Test restarted.
+02:32:21 : 06/06
+02:32:51 : Test restarted.
+02:32:51 : 07/07
+02:33:07 : Test restarted.
+02:33:07 : 07/08
+02:33:30 : Test restarted.
+02:33:30 : 08/09
+02:33:52 : Test restarted.
+02:33:52 : 08/10
+02:34:08 : Test restarted.
+02:34:08 : 09/11
+02:34:41 : Test restarted.
+02:34:41 : 09/12
+02:35:01 : Test restarted.
+02:35:01 : 09/13
+02:35:39 : Test restarted.
+02:35:39 : 09/14
+02:35:52 : Test restarted.
+02:35:52 : 09/15
+02:36:15 : Test restarted.
+02:36:15 : 09/16
+02:36:15 : Test finished.
+
+ ---------- 
+Total: 9/16
+p-value: 0.4018 (40.18%)
+
+ -- signature -- 
+6d6cb1de6966b680ebf1a1abf1a8aecf7a4b3aa4

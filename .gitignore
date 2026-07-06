@@ -37,4 +37,7 @@ obj/
 
 /tests/abx/*.wav
 /tests/abx/*.mp3
+# owner's listening-tool scratch (iZotope RX reports etc.); the foobar ABX logs ARE committed
+/tests/abx/*.json
+/tests/abx/*.report.md
 
