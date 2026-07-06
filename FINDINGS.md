@@ -131,14 +131,18 @@ in any ad-hoc benchmark.
 | CPU contention | timing runs taken while corpus validations run in the background are garbage | time on an idle machine; sanity-check totals against stage instrumentation |
 | Trivially green gates | a parity pass only proves something if the feature actually engaged; dead code passes everything | pair every gate with a measurement that shows the code path ran |
 | Missing info tag (`-t`) before the meter | without the LAME tag the decoder cannot strip encoder delay/padding; decoded audio is misaligned and the meter reads ~+14 dB of pure offset artifact with audible fraction ~1.0 | encodes that feed `nmr` must keep the tag; `-t` stays correct only in the hash-comparing bit-exact gate |
+| Fixed landing window for VBR bitrate targeting | measured kbps is only piecewise continuous in fractional `-V`: it cliffs at integer `V` and at psymodel switch points, by a measured 8-35 kbps on music and 101 kbps on one synthetic; requiring every file to land inside a 0.5 kbps window rejected 250 of 256 configs and printed a plausible-looking null | bracket the target from both sides and interpolate the meter fields to the exact bitrate; never let one file's landing kill a whole config silently |
+| MPEG1-only frame walker | LAME auto-resamples high-`-V` and low-bitrate encodes to 22.05/24 kHz MPEG2 frames; an MPEG1-only header walk misparses those files into garbage bitrates (a 30 kbps encode measured "134"), and metering their 22 kHz decodes against 44.1 kHz originals reads +130 dB of pure rate-mismatch artifact | frame walkers must parse every MPEG version; probe encodes that feed the meter pin `--resample 44.1` (hash-verified no-op at the `-V` range where the target lives) |
 
 The `$args` trap corrupted an entire benchmark round. It briefly convinced us that
 `--quality-max` was cost-neutral and that threading was useless. The missing-tag trap was
 worse: it silently degraded the fitness signal of auto-tuning campaigns 1 through 6, blinded
 their audibility constraints, and produced the false "synthetics are not monotone" claim.
 It was caught when the campaign-6 veto passed a config whose holdout audNMR was known bad,
-and a direct per-file measurement disagreed with the tool. All corrections are recorded in
-the findings below.
+and a direct per-file measurement disagreed with the tool. The window and walker traps
+together produced campaign 11's first, invalid run: an all-baseline "null" that survived
+until the config count in its own CSV was checked. All corrections are recorded in the
+findings below.
 
 ---
 
@@ -680,9 +684,69 @@ measured gain is below a careful listener's blind threshold. One instructive det
 the logs: the 400 Lux session opened 7 correct out of 7, then regressed to chance across
 the full sixteen trials. Streaks are not results; completed trial counts are.
 
+#### Campaign 11. VBR: equal-measured-size fitness makes `-V` tunable, and the bass finding transfers.
+
+Every earlier campaign left the `-V` path untouched because equal-setting comparison is
+unfair for VBR: a config that lowers masking thresholds simply spends more bits and
+"wins" on the meter while losing on size. Campaign 11 removes the loophole by scoring
+every config at equal measured bitrate: per file, fractional `-V` is bisected until 128
+kbps measured is bracketed by the nearest encode above and below, both endpoints are
+decoded and metered, and all meter fields are interpolated linearly to exactly 128. The
+same treatment applies to every file under every config, baseline included.
+
+The first run of this campaign was invalid, and both causes are now pitfalls in section
+2.5. A landing-window design (each encode had to land inside [127.5, 128] measured)
+rejected 250 of 256 random configs because measured kbps cliffs across fractional `-V`,
+so the run "concluded" baseline-optimal from a search that never engaged; the tell was
+its own CSV holding 18 configs where campaign 10's held 353. Fixing that exposed the
+MPEG1-only frame walker misreading LAME's auto-resampled high-`-V` probes (fake "134
+kbps" readings on 30 kbps MPEG2 encodes, +130 dB meter artifacts from 22 kHz decodes).
+The rework added receipts at every step: `--resample 44.1` pinned on probe encodes
+(hash-verified byte-identical at `-V 2` and `-V 4.4`), files a config cannot spend the
+full budget on scored at their ceiling with a printed note instead of killing the config,
+and an engagement proof before the real run: 7 of 7 smoke configs evaluated, fitness
+spread -5.35 to +18.2 dB, per-file receipts sane.
+
+The rerun evaluated all 353 configs. The winner survived the live veto with the val
+audibility profile improving (audNMR 5.350 vs baseline 5.413, worst file +0.274):
+
+```
+--ns-bass -4.68 --ns-alto 3.22 --ns-treble 2.47 --ns-sfb21 -7.87
+--nsmsfix 1.48 --shortthreshold 8.45,47.99 --athlower 2.86
+```
+
+Train fitness -7.0023 dB vs baseline -5.3488 (-1.65 dB). Holdouts at equal measured 128
+kbps (`tests/validate_vbr.ps1`, the same bracket-and-interpolate methodology on files the
+campaign never saw):
+
+| Corpus | Files better | Mean NMR delta | audNMR mean / worst file |
+| --- | --- | --- | --- |
+| library h-set (16) | **16 of 16** | **-2.468 dB** | +0.030 / +0.444 |
+| SQAM (70) | 60 of 64 at equal size | -0.857 dB | +0.010 / +1.173 |
+
+The ten SQAM rows counted as worse split into two benign groups plus two open flags. Six
+are quiet tracks where at least one side is scored at its bitrate ceiling (the winner
+genuinely demands fewer bits on near-transparent material, e.g. a 62 vs 93 kbps ceiling
+on track 01), so those rows compare different sizes while both sides sit at -15 to -25 dB
+mean NMR; four are the known meter-blowup synthetics moving +0.02 to +0.09 dB. The two
+audNMR rises above the 0.5 dB val tolerance, track 28 (+1.17) and track 17 (+0.73), are
+recorded as open ABX candidates, not dismissed.
+
+Transient gate (castanets, triangle, xylophone, plus the two h-files with the largest
+audNMR upticks): no trashing. Castanets and triangle at parity or slightly cleaner
+pre-echo for the winner; xylophone +4.5 dB pre-echo at a ~-94 dB absolute level, far
+below audibility; no HF dulling anywhere.
+
+The physics: `ns-bass` negative appears a fourth independent time (-4.68), now on the
+mode most listeners actually use, and `athlower` positive (+2.86) matches CBR 320's
++5.22. New at equal size: `ns-sfb21` tightened hard (-7.87, near the -8 bound) and the
+short-block thresholds nearly doubled (fewer short blocks). Both of those ride their
+search bounds, a known overfit signature, which is why the holdout table above carries
+the weight of the verdict and why the two SQAM flags stay open.
+
 #### Status
 
-Four validated opt-in configurations, none a default change:
+Five validated opt-in configurations, none a default change:
 
 | Mode | Configuration | Holdout gain |
 | --- | --- | --- |
@@ -690,10 +754,11 @@ Four validated opt-in configurations, none a default change:
 | `-q 0 -b 320` | campaign-8 winner above | -1.81 / -2.81 |
 | `-q 0 --abr 192` | `--ns-bass -5.00 --shortthreshold 4.19,23.83` | -0.22 / -0.31 |
 | `--quality-max -b 128` | campaign-10 winner | -0.10 |
+| `-V` at 128 kbps measured | campaign-11 winner above | -0.86 / -2.47 |
 
 Campaign-1 winner: demoted, receipts above. Campaigns 2 through 5: rejected on holdouts and
 guardrails. Campaign 6: superseded by the bug it caught. Receipts:
-`tests/autotune_q0_cbr128.csv` through `autotune10_qmax128.csv`.
+`tests/autotune_q0_cbr128.csv` through `autotune11_vbr128.csv`.
 
 ---
 
@@ -874,6 +939,7 @@ look excellent right up until the material is unseen.
 | Finding 5: portfolio search | rejected; preserved behind `-DLAME_QMAX_PORTFOLIO` |
 | Finding 6 campaigns 1-7 | q0-128 candidate validated + ABX'd (no audible difference); campaigns 2-5 rejected; missing-tag trap caught and fixed |
 | Finding 6 campaigns 8-10 (per-rate) | three validated opt-in configs; CBR 320 at -1.81/-2.81 dB is the project's largest gain |
+| Finding 6 campaign 11 (VBR at equal measured size) | validated opt-in config: -2.47 dB library / -0.86 SQAM at equal 128 kbps, 16/16 h-files better; two VBR measurement traps caught and recorded |
 | Podcast optimizer v2 | landed; true VBR wins at equal measured bitrate |
 | Fractional ABR | landed, regress-gated |
 | Equal-measured-size harness | landed; first result: quality-max is a no-op for modern VBR |
@@ -885,7 +951,8 @@ look excellent right up until the material is unseen.
 
 | Item | Why it matters |
 | --- | --- |
-| A real quality-max VBR mode | the representation layer measured bit-minimal already (zero wins in 34,000 granules); any gain must come from the distortion-target derivation itself (`block_sf` / `find_scalefac_x34`), an open question with an unknown prize |
+| A real quality-max VBR mode | the representation layer measured bit-minimal already (zero wins in 34,000 granules), and campaign 11 answered the psymodel side: the masking input to `block_sf` has real headroom (-2.47 dB library holdout at equal size). Still unexplored: the quantizer-side derivation itself (`find_scalefac_x34`'s distortion-target shape), now with a measured prize scale |
+| ABX the campaign-11 VBR winner | the largest-gain mode listeners actually use; SQAM tracks 28 (+1.17 audNMR) and 17 (+0.73) are the honest worst-case clips to test alongside the biggest wins |
 | Optional: focused short-clip ABX re-tests | looped short excerpts are sharper instruments than full dense tracks if a difference verdict is ever needed on small deltas |
 | Longer fuzz campaign | extend decoder safety coverage now that the harness is proven |
 

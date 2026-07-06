@@ -102,6 +102,63 @@ if (Test-Path $LuxSource) {
     Write-Host "Finding 6 per-rate second pair written (400 Lux at CBR 320)."
 }
 
+# ---- Finding 6 campaign 11: VBR at equal measured 128 kbps, stock -V vs tuned ----
+# The winner improves every library holdout file at equal size (mean -2.47 dB; see
+# FINDINGS campaign 11). Both sides are bisected in fractional -V to the closest encode
+# at or below 128 kbps measured, so the ABX compares equal-size files, not equal settings.
+# Material: h10, the largest measured win (-3.52 dB mean NMR), and SQAM track 28, the
+# honest worst case (audNMR +1.17, the largest flag the holdout raised). SQAM 17 (+0.73)
+# is the runner-up if a third pair is ever wanted.
+$W11 = '--ns-bass -4.68 --ns-alto 3.22 --ns-treble 2.47 --ns-sfb21 -7.87 --nsmsfix 1.48 --shortthreshold 8.45,47.99 --athlower 2.86'
+$Measure = "$PSScriptRoot\..\tools\podcast\bin\Release\net8.0\podcast.exe"
+function VbrBelowTarget([string]$wav, [string]$extra, [string]$outMp3, [double]$target = 128) {
+    $tmp = Join-Path ([IO.Path]::GetTempPath()) ("abxv_" + [Guid]::NewGuid().ToString('N').Substring(0, 8) + ".mp3")
+    $lo = 0.0; $hi = 9.99; $v = 4.0; $kA = [double]::NaN; $kB = [double]::NaN
+    for ($it = 0; $it -lt 14; $it++) {
+        $vs = "{0:0.###}" -f $v
+        $p = Start-Process -FilePath $Lame -ArgumentList "--quiet --nohist -V $vs --resample 44.1 $extra `"$wav`" `"$tmp`"" -Wait -NoNewWindow -PassThru
+        if ($p.ExitCode -ne 0) { return $null }
+        $k = [double](& $Measure --measure $tmp)
+        if ($k -le 0) { return $null }
+        if ($k -gt $target) { $lo = $v; if ([double]::IsNaN($kA) -or $k -lt $kA) { $kA = $k } }
+        else { if ([double]::IsNaN($kB) -or $k -gt $kB) { $kB = $k; Copy-Item $tmp $outMp3 -Force }; $hi = $v }
+        if (-not [double]::IsNaN($kA) -and -not [double]::IsNaN($kB) -and ($kA - $kB) -lt 0.25) { break }
+        if (($hi - $lo) -lt 0.004) { break }
+        $v = ($lo + $hi) / 2
+    }
+    Remove-Item $tmp -ErrorAction SilentlyContinue
+    if ([double]::IsNaN($kB)) { return $null }
+    $kB
+}
+$h10 = "$PSScriptRoot\corpus_holdout\h10.wav"
+if ((Test-Path $h10) -and (Test-Path $Measure)) {
+    Copy-Item $h10 (Join-Path $Out 'original_h10.wav') -Force
+    $kJ = VbrBelowTarget $h10 '' (Join-Path $Out 'J_stockvbr128.mp3')
+    $kK = VbrBelowTarget $h10 $W11 (Join-Path $Out 'K_tunedvbr128.mp3')
+    if ($null -ne $kJ -and $null -ne $kK) {
+        foreach ($t in 'J_stockvbr128', 'K_tunedvbr128') {
+            & $Lame --quiet --decode (Join-Path $Out "$t.mp3") (Join-Path $Out "$($t)_decoded.wav") 2>&1 | Out-Null
+        }
+        Write-Host ("Campaign 11 pair written (h10 VBR: stock {0:F1} kbps vs tuned {1:F1} kbps)." -f $kJ, $kK)
+    } else { Write-Host "Campaign 11 h10 pair SKIPPED (bisection failed)." }
+} else {
+    Write-Host "Campaign 11 h10 pair SKIPPED (needs tests/corpus_holdout/h10.wav and the podcast tool)."
+}
+$sq28 = "$PSScriptRoot\corpus\SQAM\28.wav"
+if ((Test-Path $sq28) -and (Test-Path $Measure)) {
+    Copy-Item $sq28 (Join-Path $Out 'original_sqam28.wav') -Force
+    $kL = VbrBelowTarget $sq28 '' (Join-Path $Out 'L_stockvbr128_sqam28.mp3')
+    $kM = VbrBelowTarget $sq28 $W11 (Join-Path $Out 'M_tunedvbr128_sqam28.mp3')
+    if ($null -ne $kL -and $null -ne $kM) {
+        foreach ($t in 'L_stockvbr128_sqam28', 'M_tunedvbr128_sqam28') {
+            & $Lame --quiet --decode (Join-Path $Out "$t.mp3") (Join-Path $Out "$($t)_decoded.wav") 2>&1 | Out-Null
+        }
+        Write-Host ("Campaign 11 worst-case pair written (SQAM 28: stock {0:F1} kbps vs tuned {1:F1} kbps)." -f $kL, $kM)
+    } else { Write-Host "Campaign 11 SQAM 28 pair SKIPPED (bisection failed)." }
+} else {
+    Write-Host "Campaign 11 SQAM 28 pair SKIPPED (needs tests/corpus/SQAM/28.wav and the podcast tool)."
+}
+
 # ---- Finding 3: 400 Lux full track, qmax v1 vs v2 (+ default -q0 reference) ----
 if ((Test-Path $QmaxV1) -and (Test-Path $Lame) -and (Test-Path $LuxSource)) {
     Copy-Item $LuxSource (Join-Path $Out 'original_400lux.wav') -Force

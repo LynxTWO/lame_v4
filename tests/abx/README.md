@@ -2,12 +2,15 @@
 
 Blind-test packages so a human ear confirms what the objective meter measured. (Audio files
 are git-ignored - copyrighted source. Run `tests/make_abx.ps1` to (re)generate them from your
-local corpus.) Two packages live here:
+local corpus.) The packages, with verdicts where tested:
 
 1. **Finding 1** - the `-q0` CBR/ABR noise-shaping fix (Tom's Diner clip). **CONFIRMED
    2026-07-02: 15/16, p = 0.0003** (log in this folder).
 2. **Finding 3** - `--quality-max` v2, the search-objective change (400 Lux, full track).
-   See "Finding 3" section below.
+   Tested 2026-07-04: 9/16, no audible difference.
+3. **Finding 6** - campaign-7 CBR128 pair (D/E, 7/16), campaign-8 CBR320 pairs (F/G and
+   H/I, both 9/16), and the campaign-11 VBR pairs (J/K and L/M, untested), all documented
+   below.
 
 ## Finding 1 - the CBR/ABR -q0 noise-shaping fix
 
@@ -94,6 +97,29 @@ masking tightened hard, treble relaxed, ATH raised. Holdout receipts: -1.81 dB o
 Fair warning for calibration: 320 kbps is deeply transparent territory, so even a 2 dB
 measured improvement may be inaudible. A null here would not weaken the measured result; a
 positive would make this the first tuning change with a human-audible receipt.
+
+*(Outcome 2026-07-05/06: 9/16 on both pairs, p = 0.40 - no audible difference demonstrated,
+as the calibration note anticipated. Logs archived in this folder.)*
+
+## Finding 6 campaign 11 - the VBR candidate at equal measured size
+
+`J_stockvbr128` vs `K_tunedvbr128` (h10, the library-holdout excerpt with the campaign's
+largest measured win, -3.52 dB mean NMR), and `L_stockvbr128_sqam28` vs
+`M_tunedvbr128_sqam28` (SQAM track 28) as the honest worst case: it is the one holdout
+file where the tuned config's audible-band loudness rose most (+1.17 dB audNMR) even
+though its mean improved. If the config hides an audible artifact anywhere, it's there.
+
+Both sides of each pair are bisected in fractional `-V` to the closest encode at or below
+128 kbps measured (the script prints the landed rates). Measured VBR bitrate cliffs near
+the target can leave the two sides apart - on h10 the stock side landed 125.0 kbps and
+the tuned side 119.2 - but the at-or-below rule means the size gap can only handicap the
+candidate, never favor it: the tuned encode never has more data, sometimes noticeably
+less. SQAM 28 landed clean (127.9 vs 128.0). The candidate is the campaign-11 winner: bass and sfb21 masking
+tightened, alto/treble relaxed slightly, fewer short blocks, ATH lowered. Holdout receipts:
+16 of 16 library files better (mean -2.47 dB), 60 of 64 equal-size SQAM files better
+(-0.86 dB), transients clean. 128 kbps VBR is NOT transparent territory - this is the pair
+where an audible difference is most plausible of anything the tuning campaigns have
+produced.
 
 ## If you confirm it
 

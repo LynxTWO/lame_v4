@@ -317,18 +317,29 @@ static class Program
         int pos = 0;
         if (b.Length > 10 && b[0] == 'I' && b[1] == 'D' && b[2] == '3')
             pos = 10 + ((b[6] & 0x7F) << 21 | (b[7] & 0x7F) << 14 | (b[8] & 0x7F) << 7 | (b[9] & 0x7F));
-        // MPEG1 Layer III tables (this tool only ever drives 32/44.1/48 kHz input).
-        int[] br = { 0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, -1 };
-        int[] sr = { 44100, 48000, 32000, -1 };
+        // Layer III tables, all MPEG versions: the input is 32/44.1/48 kHz, but LAME
+        // auto-resamples the OUTPUT below ~32 kbps/channel, so a low --abr landing or a
+        // high -V probe during bisection can emit MPEG2 frames at 22.05/24 kHz. An
+        // MPEG1-only walker misparses those files into garbage bitrates (caught in the
+        // autotune VBR-mode smoke, which uses this same walker).
+        int[] br1 = { 0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, -1 };
+        int[] br2 = { 0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, -1 };
+        int[] sr1 = { 44100, 48000, 32000, -1 };
         while (pos + 4 <= b.Length)
         {
             if (b[pos] != 0xFF || (b[pos + 1] & 0xE0) != 0xE0) { pos++; continue; }
             int ver = (b[pos + 1] >> 3) & 3, layer = (b[pos + 1] >> 1) & 3;
-            if (ver != 3 || layer != 1) { pos++; continue; }   // MPEG1 Layer III only
+            if (ver == 1 || layer != 1) { pos++; continue; }   // reserved version / not Layer III
             int bi = (b[pos + 2] >> 4) & 15, si = (b[pos + 2] >> 2) & 3, pad = (b[pos + 2] >> 1) & 1;
-            if (br[bi] <= 0 || sr[si] <= 0) { pos++; continue; }
-            int flen = 144000 * br[bi] / sr[si] + pad;
-            onFrame(flen, 1152.0 / sr[si]);
+            bool mpeg1 = ver == 3;
+            int bitrate = mpeg1 ? br1[bi] : br2[bi];
+            int rate = sr1[si];
+            if (rate > 0 && ver == 2) rate /= 2;       // MPEG2
+            if (rate > 0 && ver == 0) rate /= 4;       // MPEG2.5
+            if (bitrate <= 0 || rate <= 0) { pos++; continue; }
+            // MPEG2/2.5 Layer III frames carry 576 samples, half the MPEG1 1152
+            int flen = (mpeg1 ? 144000 : 72000) * bitrate / rate + pad;
+            onFrame(flen, (mpeg1 ? 1152.0 : 576.0) / rate);
             pos += flen;
         }
     }
