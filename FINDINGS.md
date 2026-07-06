@@ -221,12 +221,23 @@ Measured against stock `-q0`, meanNMRdb, lower is better:
 | ABR 192 | -0.605 |
 | V0 | 0.000 by equal-setting NMR |
 
-The VBR row was later resolved precisely by the equal-measured-size harness:
-`--quality-max` is a no-op for the modern VBR path. `vbr_mtrh` (the `-V` default) runs
-through `vbrquantize.c`, which consults neither `use_best_huffman` nor `full_outer_loop`;
-bisected to matched bitrates, stock and quality-max VBR encodes are byte-identical on every
-holdout file. Making the flag mean something for VBR requires wiring deeper search into
-`VBR_encode_granule` itself, which is future work.
+The VBR row was later resolved by the equal-measured-size harness and a wiring attempt.
+`--quality-max` is measurably a no-op for the modern VBR path (`vbr_mtrh`, the `-V`
+default): bisected to matched bitrates it was byte-identical on every holdout file, and at
+`-V 2` directly it differs in bytes (the `use_best_huffman` 1-vs-2 routing takes different
+code paths to the same place) while measuring identical in quality (deltas 0.000) and size
+(-52 bytes across 11.5 MB). The flag's search knobs simply have nothing to grip:
+`vbrquantize.c` never consults `full_outer_loop` above -1, and its bit counting already
+applies the optimal Huffman partitioning both ways.
+
+A first wiring attempt confirmed how little slack the path has. The constrain step maps
+per-band step targets to one legal (gain, scale, preflag) representation by fixed
+preference; a quality-max search over gain-parity alternatives (rebuild scalefactors at
+gain +1..3, accept only representations finer-or-equal than every band target, keep the
+fewest measured bits) scored **zero wins in 34,000 granules**. The 2012-era constrain
+logic already lands bit-minimal representations. Rejected and reverted; a real quality-max
+VBR mode would have to change the distortion-target derivation itself (`block_sf` /
+`find_scalefac_x34`), which is open work with an unknown prize.
 
 Safety receipt: purely additive, bit-exact gate 70/70 green for every existing setting.
 
@@ -874,7 +885,7 @@ look excellent right up until the material is unseen.
 
 | Item | Why it matters |
 | --- | --- |
-| Wire `--quality-max` into the modern VBR path | the flag is currently a no-op for `-V` encodes (`vbrquantize.c` consults none of its knobs); the largest untouched quality surface |
+| A real quality-max VBR mode | the representation layer measured bit-minimal already (zero wins in 34,000 granules); any gain must come from the distortion-target derivation itself (`block_sf` / `find_scalefac_x34`), an open question with an unknown prize |
 | Optional: focused short-clip ABX re-tests | looped short excerpts are sharper instruments than full dense tracks if a difference verdict is ever needed on small deltas |
 | Longer fuzz campaign | extend decoder safety coverage now that the harness is proven |
 
