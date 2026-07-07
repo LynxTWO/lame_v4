@@ -62,8 +62,8 @@ $rows = $wavs | ForEach-Object -ThrottleLimit $Throttle -Parallel {
                 $dec = Join-Path $work "$tag.dec.wav"
                 Start-Process -FilePath $lame -ArgumentList "--quiet --decode `"$m`" `"$dec`"" -Wait -NoNewWindow | Out-Null
                 $f = ((& $nmr $wav $dec 2>$null | Select-Object -First 1) -split '\s+') | Where-Object { $_ }
-                if ($f.Count -lt 4) { return $null }
-                ,@([double]$f[0], [double]$f[1], [double]$f[2], [double]$f[3])
+                if ($f.Count -lt 5) { return $null }   # field 5 = hfStabDb (campaign 12)
+                ,@([double]$f[0], [double]$f[1], [double]$f[2], [double]$f[3], [double]$f[4])
             }
             if ([double]::IsNaN($kA)) {   # ceiling below target: best-within-budget
                 $r = Meter (Join-Path $work "$tag.b.mp3"); if ($null -eq $r) { return $null }
@@ -76,7 +76,7 @@ $rows = $wavs | ForEach-Object -ThrottleLimit $Throttle -Parallel {
             $rA = Meter (Join-Path $work "$tag.a.mp3"); if ($null -eq $rA) { return $null }
             $rB = Meter (Join-Path $work "$tag.b.mp3"); if ($null -eq $rB) { return $null }
             $t = ($target - $kB) / ($kA - $kB)
-            $f = 0..3 | ForEach-Object { $rB[$_] + ($rA[$_] - $rB[$_]) * $t }
+            $f = 0..4 | ForEach-Object { $rB[$_] + ($rA[$_] - $rB[$_]) * $t }
             [pscustomobject]@{ f = $f; note = '' }
         }
         $mA = SideMetrics '' 'A'
@@ -87,37 +87,42 @@ $rows = $wavs | ForEach-Object -ThrottleLimit $Throttle -Parallel {
         else {
             [pscustomobject]@{
                 name = $_.BaseName; skip = $false
-                Amean = $mA.f[0]; Aaud = $mA.f[1]; AaudNmr = $mA.f[2]; Amax = $mA.f[3]; Anote = $mA.note
-                Bmean = $mB.f[0]; Baud = $mB.f[1]; BaudNmr = $mB.f[2]; Bmax = $mB.f[3]; Bnote = $mB.note
+                Amean = $mA.f[0]; Aaud = $mA.f[1]; AaudNmr = $mA.f[2]; Amax = $mA.f[3]; Astab = $mA.f[4]; Anote = $mA.note
+                Bmean = $mB.f[0]; Baud = $mB.f[1]; BaudNmr = $mB.f[2]; Bmax = $mB.f[3]; Bstab = $mB.f[4]; Bnote = $mB.note
             }
         }
     }
     finally { Remove-Item -Recurse -Force $work -ErrorAction SilentlyContinue }
 }
 
-Write-Host ("{0,-24} {1,20} {2,20} {3,8} {4,8}  {5}" -f 'file', 'A(mean/audN/max)', 'B(mean/audN/max)', 'dMean', 'dAudN', 'notes')
-Write-Host ("-" * 96)
-$agg = @{ Amean=0.0; Bmean=0.0; AaudNmr=0.0; BaudNmr=0.0; Amax=[double]::NegativeInfinity; Bmax=[double]::NegativeInfinity
-          better=0; worse=0; maxWorse=0.0; maxWorseAud=0.0; n=0 }
+Write-Host ("{0,-24} {1,20} {2,20} {3,8} {4,8} {5,8}  {6}" -f 'file', 'A(mean/audN/max)', 'B(mean/audN/max)', 'dMean', 'dAudN', 'dStab', 'notes')
+Write-Host ("-" * 104)
+$agg = @{ Amean=0.0; Bmean=0.0; AaudNmr=0.0; BaudNmr=0.0; Astab=0.0; Bstab=0.0
+          Amax=[double]::NegativeInfinity; Bmax=[double]::NegativeInfinity
+          better=0; worse=0; maxWorse=0.0; maxWorseAud=0.0; maxWorseStab=0.0; n=0 }
 foreach ($r in ($rows | Sort-Object name)) {
     if ($r.skip) { Write-Host ("{0,-24} skipped (unbracketable at {1} kbps)" -f $r.name, $Target); continue }
     $d = $r.Bmean - $r.Amean
     $dAud = $r.BaudNmr - $r.AaudNmr
+    $dStab = $r.Bstab - $r.Astab
     $agg.Amean += $r.Amean; $agg.Bmean += $r.Bmean; $agg.AaudNmr += $r.AaudNmr; $agg.BaudNmr += $r.BaudNmr
+    $agg.Astab += $r.Astab; $agg.Bstab += $r.Bstab
     if ($r.Amax -gt $agg.Amax) { $agg.Amax = $r.Amax }
     if ($r.Bmax -gt $agg.Bmax) { $agg.Bmax = $r.Bmax }
     if ($d -lt -0.01) { $agg.better++ } elseif ($d -gt 0.01) { $agg.worse++; if ($d -gt $agg.maxWorse) { $agg.maxWorse = $d } }
     if ($dAud -gt $agg.maxWorseAud) { $agg.maxWorseAud = $dAud }
+    if ($dStab -gt $agg.maxWorseStab) { $agg.maxWorseStab = $dStab }
     $agg.n++
     $flag = if ($d -lt -0.01) { 'BETTER' } elseif ($d -gt 0.01) { 'worse' } else { '' }
     $notes = (@($r.Anote, $r.Bnote) | Where-Object { $_ }) -join ' / '
-    Write-Host ("{0,-24} {1,7:F2}/{2,5:F2}/{3,5:F1} {4,7:F2}/{5,5:F2}/{6,5:F1} {7,8:F3} {8,8:F3}  {9} {10}" -f `
-        $r.name, $r.Amean, $r.AaudNmr, $r.Amax, $r.Bmean, $r.BaudNmr, $r.Bmax, $d, $dAud, $flag, $notes)
+    Write-Host ("{0,-24} {1,7:F2}/{2,5:F2}/{3,5:F1} {4,7:F2}/{5,5:F2}/{6,5:F1} {7,8:F3} {8,8:F3} {9,8:F3}  {10} {11}" -f `
+        $r.name, $r.Amean, $r.AaudNmr, $r.Amax, $r.Bmean, $r.BaudNmr, $r.Bmax, $d, $dAud, $dStab, $flag, $notes)
 }
 $n = $agg.n
 if ($n -eq 0) { Write-Error 'no scorable files'; exit 2 }
-Write-Host ("-" * 96)
+Write-Host ("-" * 104)
 Write-Host ("MEAN meanNMR : A={0:F3}  B={1:F3}  delta={2:F3}   (delta<0 => B more transparent at equal size)" -f ($agg.Amean/$n), ($agg.Bmean/$n), (($agg.Bmean-$agg.Amean)/$n))
 Write-Host ("MEAN audNMR  : A={0:F3}  B={1:F3}  delta={2:F3}   (audible-band loudness; the campaign veto watches this)" -f ($agg.AaudNmr/$n), ($agg.BaudNmr/$n), (($agg.BaudNmr-$agg.AaudNmr)/$n))
+Write-Host ("MEAN hfStab  : A={0:F3}  B={1:F3}  delta={2:F3}   (HF temporal instability, the campaign-12 swirl meter; caught pairs measured +0.15..+1.52 per file)" -f ($agg.Astab/$n), ($agg.Bstab/$n), (($agg.Bstab-$agg.Astab)/$n))
 Write-Host ("WORST maxNMR : A={0:F1}  B={1:F1}   (single loudest band across corpus; B must not blow up)" -f $agg.Amax, $agg.Bmax)
-Write-Host ("Files: {0} better / {1} worse / {2} tie   worst regression: mean +{3:F3} dB, audNMR +{4:F3} dB" -f $agg.better, $agg.worse, ($n-$agg.better-$agg.worse), $agg.maxWorse, $agg.maxWorseAud)
+Write-Host ("Files: {0} better / {1} worse / {2} tie   worst regression: mean +{3:F3} dB, audNMR +{4:F3} dB, hfStab +{5:F3}" -f $agg.better, $agg.worse, ($n-$agg.better-$agg.worse), $agg.maxWorse, $agg.maxWorseAud, $agg.maxWorseStab)

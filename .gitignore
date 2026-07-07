@@ -37,9 +37,9 @@ obj/
 
 /tests/abx/*.wav
 /tests/abx/*.mp3
-# blind preference package (regenerable via tests/make_pref.ps1; committing the answer
+# blind preference packages (regenerable via tests/make_pref.ps1; committing the answer
 # key would also unblind future runs)
-/tests/abx/pref/
+/tests/abx/pref*/
 # owner's listening-tool scratch (iZotope RX reports etc.); the foobar ABX logs ARE committed
 /tests/abx/*.json
 /tests/abx/*.report.md

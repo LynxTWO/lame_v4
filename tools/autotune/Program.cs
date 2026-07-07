@@ -131,9 +131,23 @@ static class Program
     static double baselineValAudMean = double.NaN;
     static readonly Dictionary<string, bool> vetCache = new Dictionary<string, bool>();
 
+    // Campaign-12 veto extension: the campaign-11 demotion (anchored blind fidelity, stock
+    // judged closer on 5 of 5 pairs) proved a config can pass every LEVEL-based gate while
+    // a listener hears "swirly highs" and "unstable quiet cymbals". nmr field 5 (hfStabDb)
+    // measures HF temporal instability - how differently the decoded high-frequency texture
+    // MOVES versus the original. Acceptance receipts: on the five labeled fidelity pairs the
+    // demoted config scored +0.15..+1.52 above stock (magnitudes tracking the listener's own
+    // confidence), while the ABX-null benign configs (CBR320, campaign-7) scored +0.06..+0.09.
+    // The tolerances sit between those clusters.
+    const double STAB_FILE_TOL = 0.15;
+    const double STAB_MEAN_TOL = 0.10;
+    static double[] baselineValStab;
+    static double baselineValStabMean = double.NaN;
+
     static int Main(string[] args)
     {
-        string train = null, valDir = null, outCsv = "autotune_results.csv";
+        string train = null, valDir = null, outCsv = "autotune_results.csv", evalConfig = null;
+        double shortfactorMax = 0;
         int nRandom = 128, nRefine = 2;
         setting = "-q 0 -b 128";
         jobs = Environment.ProcessorCount;
@@ -155,6 +169,12 @@ static class Program
                 case "--lame": lamePath = args[++i]; break;
                 case "--nmr": nmrPath = args[++i]; break;
                 case "--out": outCsv = args[++i]; break;
+                // campaign 12: never search MORE long blocks than stock (the campaign-11
+                // demotion traced the fidelity loss to a ~2x shortthreshold raise)
+                case "--shortfactor-max": shortfactorMax = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
+                // evaluate + vet ONE config (comma-separated knob values in Knobs order)
+                // and exit; used to prove a new gate rejects a known-bad config
+                case "--eval": evalConfig = args[++i]; break;
                 default: Console.Error.WriteLine($"unknown option {args[i]}"); return 2;
             }
         }
@@ -179,6 +199,15 @@ static class Program
             if (valWavs != null) valWavs = FilterBracketable(valWavs, "val");
             if (trainWavs.Length == 0) { Console.Error.WriteLine("no bracketable train files"); return 2; }
         }
+        if (shortfactorMax > 0)
+        {
+            foreach (var k in Knobs)
+                if (k.Name == "shortfactor" && k.Hi > shortfactorMax)
+                {
+                    k.Hi = shortfactorMax;
+                    Console.WriteLine($"shortfactor search bound capped at {shortfactorMax} (campaign-12 rule)");
+                }
+        }
         string modeDesc = vbrTarget > 0 ? $"VBR interpolated at {vbrTarget} kbps measured" : $"setting=\"{setting}\"";
         Console.WriteLine($"train={trainWavs.Length} files  val={(valWavs?.Length ?? 0)}  {modeDesc}  random={nRandom} refine={nRefine} jobs={jobs}");
 
@@ -189,6 +218,23 @@ static class Program
         double baseScore = Evaluate(baseline);
         Console.WriteLine($"BASELINE meanNMR = {baseScore:F4} dB");
         results.Add((baseline, baseScore));
+
+        if (evalConfig != null)
+        {
+            var xe = evalConfig.Split(',').Select(s => double.Parse(s, CultureInfo.InvariantCulture)).ToArray();
+            if (xe.Length != Knobs.Length)
+            {
+                Console.Error.WriteLine($"--eval needs {Knobs.Length} comma-separated knob values ({string.Join(",", Knobs.Select(k => k.Name))})");
+                return 2;
+            }
+            double se = Evaluate(xe);
+            Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
+                "EVAL fitness {0:F4} (baseline {1:F4}, delta {2:+0.0000;-0.0000}) | {3}",
+                se, baseScore, se - baseScore, ArgsFor(xe)));
+            bool ok = Vet(xe);
+            Console.WriteLine($"EVAL vet: {(ok ? "PASS" : "REJECT")}");
+            return 0;
+        }
 
         // Round 1: random search, deterministic seed for reproducibility.
         var rng = new Random(42);
@@ -276,11 +322,14 @@ static class Program
                 results.Add((configs[i], scores[i]));
     }
 
-    // One pass over a wav set: mean meanNMRdb + per-file audibleNMRdb. False on any failure.
-    static bool EvaluateOn(string[] wavs, double[] x, out double mean, out double[] audPerFile)
+    // One pass over a wav set: mean meanNMRdb + per-file audibleNMRdb + per-file hfStabDb.
+    // False on any failure.
+    static bool EvaluateOn(string[] wavs, double[] x, out double mean, out double[] audPerFile,
+                           out double[] stabPerFile)
     {
         mean = double.NaN;
         audPerFile = new double[wavs.Length];
+        stabPerFile = new double[wavs.Length];
         string dir = Path.Combine(Path.GetTempPath(), "autotune_" + Guid.NewGuid().ToString("N").Substring(0, 8));
         Directory.CreateDirectory(dir);
         try
@@ -325,14 +374,14 @@ static class Program
                     }
                     if (double.IsNaN(kA) && double.IsNaN(kB))
                         { Console.WriteLine($"   eval fail: no encode at all for {Path.GetFileName(wavs[i])} {extra}"); return false; }
-                    double mi, ai;
+                    double mi, ai, si;
                     if (double.IsNaN(kA))
                     {
                         // Ceiling below target: even -V0 cannot spend the full budget on
                         // this file under this config (knobs can cut demand >20%, past any
                         // pre-filter margin). Score the config's best encode WITHIN the
                         // budget -- honest "best it can do at <= target size", no NaN.
-                        if (!Score(wavs[i], mpB, dec, out mi, out ai)) return false;
+                        if (!Score(wavs[i], mpB, dec, out mi, out ai, out si)) return false;
                         Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
                             "   note: {0} ceiling {1:F1} < {2}; scored at ceiling | {3}",
                             Path.GetFileName(wavs[i]), kB, vbrTarget, extra));
@@ -342,29 +391,32 @@ static class Program
                         // Floor above target: the config overspends on this file at any -V.
                         // Scored at the floor (more bits than budget, mild advantage); the
                         // strict equal-size holdout validation catches any winner built on it.
-                        if (!Score(wavs[i], mpA, dec, out mi, out ai)) return false;
+                        if (!Score(wavs[i], mpA, dec, out mi, out ai, out si)) return false;
                         Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
                             "   note: {0} floor {1:F1} > {2}; scored at floor | {3}",
                             Path.GetFileName(wavs[i]), kA, vbrTarget, extra));
                     }
                     else
                     {
-                        if (!Score(wavs[i], mpA, dec, out double mA, out double aA)) return false;
-                        if (!Score(wavs[i], mpB, dec, out double mB, out double aB)) return false;
+                        if (!Score(wavs[i], mpA, dec, out double mA, out double aA, out double sA)) return false;
+                        if (!Score(wavs[i], mpB, dec, out double mB, out double aB, out double sB)) return false;
                         double t = (vbrTarget - kB) / (kA - kB);
                         mi = mB + (mA - mB) * t;
                         ai = aB + (aA - aB) * t;
+                        si = sB + (sA - sB) * t;
                     }
                     sum += mi;
                     audPerFile[i] = ai;
+                    stabPerFile[i] = si;
                     continue;
                 }
                 if (!Run(lamePath, $"--quiet --nohist {setting} {extra} {Quote(wavs[i])} {Quote(mp3)}"))
                     return false;
-                if (!Score(wavs[i], mp3, dec, out double m, out double a))
+                if (!Score(wavs[i], mp3, dec, out double m, out double a, out double s))
                     return false;
                 sum += m;
                 audPerFile[i] = a;
+                stabPerFile[i] = s;
             }
             mean = sum / wavs.Length;
             return true;
@@ -375,17 +427,20 @@ static class Program
         }
     }
 
-    // Decode one mp3 and run the meter: field 1 = meanNMRdb, field 3 = audNMRdb.
-    static bool Score(string wav, string mp3, string dec, out double meanNmr, out double audNmr)
+    // Decode one mp3 and run the meter: field 1 = meanNMRdb, field 3 = audNMRdb,
+    // field 5 = hfStabDb (the campaign-12 temporal-stability meter; requires current nmr).
+    static bool Score(string wav, string mp3, string dec, out double meanNmr, out double audNmr,
+                      out double hfStab)
     {
-        meanNmr = audNmr = double.NaN;
+        meanNmr = audNmr = hfStab = double.NaN;
         if (!Run(lamePath, $"--quiet --decode {Quote(mp3)} {Quote(dec)}"))
             return false;
         string line = RunCapture(nmrPath, $"{Quote(wav)} {Quote(dec)}");
         var f = (line ?? "").Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-        if (f.Length < 3) return false;
+        if (f.Length < 5) return false;
         meanNmr = double.Parse(f[0], CultureInfo.InvariantCulture);
         audNmr = double.Parse(f[2], CultureInfo.InvariantCulture);
+        hfStab = double.Parse(f[4], CultureInfo.InvariantCulture);
         return true;
     }
 
@@ -393,16 +448,18 @@ static class Program
     // The very first call (all-defaults) records the train AND val baselines.
     static double Evaluate(double[] x)
     {
-        if (!EvaluateOn(trainWavs, x, out double mean, out double[] aud))
+        if (!EvaluateOn(trainWavs, x, out double mean, out double[] aud, out _))
             return double.NaN;
         if (baselineAudPerFile == null)
         {
             baselineAudPerFile = aud;
             if (valWavs != null && valWavs.Length > 0
-                && EvaluateOn(valWavs, x, out _, out double[] vaud))
+                && EvaluateOn(valWavs, x, out _, out double[] vaud, out double[] vstab))
             {
                 baselineValAud = vaud;
                 baselineValAudMean = vaud.Average();
+                baselineValStab = vstab;
+                baselineValStabMean = vstab.Average();
             }
             return mean;
         }
@@ -422,12 +479,13 @@ static class Program
         if (vetCache.TryGetValue(key, out bool cached))
             return cached;
         bool pass = false;
-        double vMean = double.NaN;
+        double vMean = double.NaN, sMean = double.NaN;
         int worst = -1;
-        double worstDelta = double.NegativeInfinity;
-        if (EvaluateOn(valWavs, x, out _, out double[] vaud))
+        double worstDelta = double.NegativeInfinity, worstStab = double.NegativeInfinity;
+        if (EvaluateOn(valWavs, x, out _, out double[] vaud, out double[] vstab))
         {
             vMean = vaud.Average();
+            sMean = vstab.Average();
             pass = vMean <= baselineValAudMean + VAL_MEAN_TOL;
             for (int i = 0; i < vaud.Length; i++)
             {
@@ -436,12 +494,25 @@ static class Program
                 if (d > VAL_FILE_TOL)
                     pass = false;
             }
+            // Campaign-12 stability gate (see STAB_* note): no val file may swirl.
+            if (baselineValStab != null)
+            {
+                if (sMean > baselineValStabMean + STAB_MEAN_TOL)
+                    pass = false;
+                for (int i = 0; i < vstab.Length; i++)
+                {
+                    double d = vstab[i] - baselineValStab[i];
+                    if (d > worstStab) worstStab = d;
+                    if (d > STAB_FILE_TOL)
+                        pass = false;
+                }
+            }
         }
         vetCache[key] = pass;
         Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
-            "   vet {0}: valAud {1:F3} (base {2:F3}), worst file +{3:F3} [{4}]: {5}",
+            "   vet {0}: valAud {1:F3} (base {2:F3}), worst file +{3:F3} [{4}], stab {6:F3} (base {7:F3}) worst +{8:F3}: {5}",
             pass ? "PASS" : "reject", vMean, baselineValAudMean, worstDelta, worst,
-            key == "" ? "(baseline)" : key));
+            key == "" ? "(baseline)" : key, sMean, baselineValStabMean, worstStab));
         return pass;
     }
 

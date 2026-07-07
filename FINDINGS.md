@@ -824,9 +824,65 @@ Complete human verdict for the campaign-11 candidate: audibly different at equal
 (16/16), head-to-head pleasantness neutral (3/5), **anchored fidelity 0/5 - stock wins
 unanimously**.
 
+#### Campaign 12. The listener's verdict becomes an instrument, and the bass correction gets its fidelity-audited dose.
+
+The demotion left one open question: was any of campaign 11's headroom real, or was it
+all spent texture stability? Campaign 12 answers it with a new meter field, a new veto
+head, and a rerun. The result: **the bass correction is real but fidelity-bounded** -
+`--ns-bass -1.50` alone survives every gate and improves 82 of 83 holdout files at equal
+measured size.
+
+The instrument first. `nmr` grew a fifth output field, `hfStabDb`: per HF range (4-8,
+8-12, 12-16 kHz), the RMS difference between the original's and the decode's
+frame-to-frame log-energy deltas - how differently the decoded high-frequency texture
+MOVES, which is what "swirly" and "unstable cymbals" describe. Smearing flattens the
+decoded deltas, swirl adds spurious ones; both raise the score. Near-silent frames are
+skipped. Existing fields are byte-identical, so every recorded number stays comparable.
+
+Acceptance before use, on the listener's own labeled pairs: the demoted config scored
+above stock on **5 of 5** anchored-fidelity pairs, with magnitudes tracking the
+listener's stated confidence (+1.52 on the pair judged most emphatically, +0.06 on the
+one called "harder"), while the ABX-null benign pairs (CBR 320, campaign 7) measured
++0.06 to +0.09. The veto tolerances sit between the clusters: no val file may rise more
+than 0.15, the val mean no more than 0.10. Canary receipt: the demoted campaign-11
+winner, re-evaluated under the new gate, is now **rejected at 16x the per-file cap**
+(worst val file +2.487) while still passing the old audNMR veto exactly as it did
+historically. The config that reached the listener can never reach one again.
+
+The rerun: same 353-config search at equal measured 128 kbps, with the short-block
+thresholds capped at stock (`--shortfactor-max 1.0`; the demotion traced the percept to
+the ~2x raise). The gate then taught two things the cap alone would have missed. First,
+the swirl has a second mechanism: the `ns-sfb21 -7.87` family still destabilizes HF
+texture with stock short blocks (best raw fitness -0.44, vetoed at stability worst
++1.435). Second, the bass knob itself has a measured dose-response: -4.00 rejected
+(+0.424), -2.00 rejected (+0.174), **-1.50 passes (+0.135)**.
+
+Winner verdicts at equal measured 128 kbps (`tests/validate_vbr.ps1`, which now carries
+the stability column):
+
+| Corpus | Files better | Mean NMR delta | audNMR mean / worst | hfStab mean / worst |
+| --- | --- | --- | --- | --- |
+| library h-set (16) | **16 of 16** | -0.311 dB | +0.044 / +0.082 | +0.076 / +0.226 |
+| SQAM (70) | **66 of 67 scored** | -0.247 dB | +0.016 / +0.131 | +0.039 / +0.329 |
+
+The honest flag: h14's stability rises +0.226, and the anchored round demonstrated this
+listener can catch deltas of +0.15 (and arguably +0.06) on exactly this kind of
+material. So the winner's status is meter-validated with the gate clean on its own val
+material, and the anchored fidelity round (package regenerated in `tests/abx/pref12/`)
+is the bar before it is recommended - the same bar Finding 7 carries.
+
+One physics revision, scoped to what was measured: the bass direction is now confirmed a
+fifth independent time, but campaign 12 shows the meter-optimal dose overshoots what
+fidelity allows at 128 kbps VBR - the -4.7 dose bought its meter points partly with
+texture stability that level meters cannot see. The CBR 320 winner's -8 dose is not
+implicated (everything at 320 sits far under masking and its ABX was null), but the
+campaign-7 CBR 128 dose of -2.50 now deserves a stability spot-check before anyone
+treats it as beyond question.
+
 #### Status
 
-Four validated opt-in configurations, none a default change:
+Four validated opt-in configurations plus one stability-gated candidate, none a default
+change:
 
 | Mode | Configuration | Holdout gain |
 | --- | --- | --- |
@@ -834,13 +890,14 @@ Four validated opt-in configurations, none a default change:
 | `-q 0 -b 320` | campaign-8 winner above | -1.81 / -2.81 |
 | `-q 0 --abr 192` | `--ns-bass -5.00 --shortthreshold 4.19,23.83` | -0.22 / -0.31 |
 | `--quality-max -b 128` | campaign-10 winner | -0.10 |
+| `-V` at 128 kbps measured | `--ns-bass -1.50` (campaign 12, stability-gated; anchored fidelity round pending) | -0.25 / -0.31 |
 
 The campaign-11 winner is **demoted** (2026-07-06): audibly different at equal size (ABX
 16/16), but an anchored blind fidelity round judged stock closer to the original on 5 of
 5 pairs - the meter numbers stand as measurements, the recommendation does not. Receipts
 in the Human ABX subsection above. Campaign-1 winner: demoted, receipts above. Campaigns
 2 through 5: rejected on holdouts and guardrails. Campaign 6: superseded by the bug it
-caught. Receipts: `tests/autotune_q0_cbr128.csv` through `autotune11_vbr128.csv`.
+caught. Receipts: `tests/autotune_q0_cbr128.csv` through `autotune12_vbr128_stab.csv`.
 
 ---
 
@@ -1097,6 +1154,7 @@ look excellent right up until the material is unseen.
 | Finding 6 campaigns 1-7 | q0-128 candidate validated + ABX'd (no audible difference); campaigns 2-5 rejected; missing-tag trap caught and fixed |
 | Finding 6 campaigns 8-10 (per-rate) | three validated opt-in configs; CBR 320 at -1.81/-2.81 dB is the project's largest gain |
 | Finding 6 campaign 11 (VBR at equal measured size) | winner DEMOTED: -2.47 dB library at equal 128 kbps and ABX 16/16 (first audible tuning change of the project), but anchored blind fidelity went 5/5 to stock - the first time the listening program overturned the meter; two VBR measurement traps caught and recorded |
+| Finding 6 campaign 12 (stability-gated rerun) | the listener's fidelity verdicts became a meter (nmr field 5, hfStabDb; acceptance 5/5 on the labeled pairs) and a veto head (canary: the demoted config now rejects at 16x the cap); winner `--ns-bass -1.50` improves 82 of 83 holdout files at equal 128 kbps (-0.31/-0.25), anchored round pending |
 | Finding 7: quality-max VBR scalefactor search | merged; the tri predicate's one-step-finer margin (~8% of bits) removed, its lattice-fluke check kept; -0.43 dB library holdout at equal 128 kbps, SQAM flat, transients clean; not additive with the campaign-11 flags |
 | Podcast optimizer v2 | landed; true VBR wins at equal measured bitrate |
 | Fractional ABR | landed, regress-gated |
@@ -1110,7 +1168,8 @@ look excellent right up until the material is unseen.
 | Item | Why it matters |
 | --- | --- |
 | Quality-max VBR at other rates | Finding 7 and campaign 11 were both validated at 128 kbps measured; `-V 2`-class rates (~190 kbps) should be spot-checked with the same equal-size harness before either is recommended there |
-| Campaign 12: temporal-stability guardrail | the campaign-11 demotion showed the fitness family (mean NMR + per-file audNMR + onset pre-echo) under-constrains sustained-HF temporal stability - "swirly highs, unstable quiet cymbals" slipped every gate. Design: add a frame-to-frame HF error-variance (or modulation-spectrum) term to the veto, cap short-block-threshold bounds at stock, rerun the -V search |
+| Anchored fidelity rounds: campaign-12 winner and Finding 7 | both are meter-validated only; `tests/abx/pref12/` holds the regenerated five-pair package for the campaign-12 winner (h14 is the pair to hammer - its stability delta +0.226 sits in the range the listener has demonstrated hearing). Finding 7 needs its own package before any recommendation |
+| Stability spot-check of the campaign-7 CBR 128 config | its `--ns-bass -2.50` dose exceeds the fidelity-audited -1.50 found at 128 VBR; one validate run with the stability column settles whether the CBR context behaves differently |
 | Optional: focused short-clip ABX re-tests | looped short excerpts are sharper instruments than full dense tracks if a difference verdict is ever needed on small deltas |
 | Longer fuzz campaign | extend decoder safety coverage now that the harness is proven |
 

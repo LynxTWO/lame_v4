@@ -14,7 +14,9 @@
 # reported as small-N blind preference, not a significance claim.
 [CmdletBinding()]
 param(
-    [string]$Cfg = "--ns-bass -4.68 --ns-alto 3.22 --ns-treble 2.47 --ns-sfb21 -7.87 --nsmsfix 1.48 --shortthreshold 8.45,47.99 --athlower 2.86",
+    # default = the campaign-12 winner (the campaign-11 config this package was built for
+    # is demoted; regenerate its pairs by passing its flags explicitly if ever needed)
+    [string]$Cfg = "--ns-bass -1.50",
     [double]$Target = 128,
     [int]$Seed = 20260706,
     [string]$Lame = "$PSScriptRoot\..\output\lame.exe",

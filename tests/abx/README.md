@@ -173,6 +173,18 @@ background cymbals" (h14, h08). This inverted the meter's -2.5 to -3.5 dB verdic
 same files and **demoted the campaign-11 config** - the percept maps onto its doubled
 short-block thresholds, an axis no guardrail watched. See FINDINGS campaign 11.)*
 
+## Campaign-12 winner package (`pref12/`)
+
+Same five-pair anchored protocol, regenerated for the campaign-12 winner
+(`--ns-bass -1.50`, the stability-gated dose). The pair that matters most is **P4 (h14)**:
+it is the file where the winner's measured stability delta (+0.226) sits inside the range
+this listener has demonstrated hearing, and it landed clean (127.92 vs 127.89 kbps).
+Disclosure: on P1, P2 and P5 the bitrate cliffs left the tuned side 1.4-1.6 kbps ABOVE
+stock, so on those pairs a tuned fidelity win could partly be the extra bits - a stock
+win there would be despite fewer bits, which is stronger evidence. P3 and P4 are clean
+matches. Record verdicts (closer to the original: A, B, or no call) before opening the
+key.
+
 ## If you confirm it
 
 Finding 1 is already shipped. For Finding 3: v2 is opt-in and all objective guardrails passed,

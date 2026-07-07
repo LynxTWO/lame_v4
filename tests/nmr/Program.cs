@@ -41,6 +41,23 @@ static class Program
         double sumNmr = 0, sumAudible = 0; long frames = 0, bandFrames = 0, audibleBandFrames = 0;
         double maxNmr = double.NegativeInfinity;
 
+        // HF temporal-instability meter (campaign 12). The campaign-11 demotion showed a
+        // config can win every level-based gate while a listener hears "swirly highs" and
+        // "unstable quiet cymbals": the decoded HF texture MOVES differently than the
+        // original's. Level meters cannot see that - two encodes with identical per-frame
+        // error energy can modulate that energy very differently. So: per HF range, track
+        // the frame-to-frame delta of log energy for original and decoded, and accumulate
+        // the RMS difference of those delta series. Smearing flattens the decoded deltas,
+        // swirl adds spurious ones; both raise the score. Frames where the original range
+        // is near-silent are skipped so silence cannot dilute the score.
+        int[] hfLoHz = { 4000, 8000, 12000 };
+        int[] hfHiHz = { 8000, 12000, 16000 };
+        int nhf = hfLoHz.Length;
+        var hfPrevO = new double[nhf]; var hfPrevD = new double[nhf];
+        var hfPrevValid = new bool[nhf];
+        double hfSum = 0; long hfCount = 0;
+        const double HF_FLOOR_DB = -70.0;   // original range must carry real energy
+
         var reO = new double[N]; var imO = new double[N];
         var reD = new double[N]; var imD = new double[N];
 
@@ -69,6 +86,30 @@ static class Program
                 sig[b] = s; noise[b] = e;
             }
 
+            // HF instability: per range, log-energy deltas orig vs decoded.
+            for (int h = 0; h < nhf; h++)
+            {
+                int kLo = hfLoHz[h] * N / SR, kHi = Math.Min(N / 2, hfHiHz[h] * N / SR);
+                double eo = 0, ed = 0;
+                for (int k = kLo; k < kHi; k++)
+                {
+                    eo += reO[k] * reO[k] + imO[k] * imO[k];
+                    ed += reD[k] * reD[k] + imD[k] * imD[k];
+                }
+                double lo_ = 10.0 * Math.Log10(eo + 1e-12);
+                double ld_ = 10.0 * Math.Log10(ed + 1e-12);
+                bool loud = lo_ > HF_FLOOR_DB;
+                if (hfPrevValid[h] && loud)
+                {
+                    double dO = lo_ - hfPrevO[h];
+                    double dD = ld_ - hfPrevD[h];
+                    hfSum += (dD - dO) * (dD - dO);
+                    hfCount++;
+                }
+                hfPrevO[h] = lo_; hfPrevD[h] = ld_;
+                hfPrevValid[h] = loud;
+            }
+
             // Masking threshold = spread(signal) but never below ATH.
             var mask = Spread(sig, bark);
             for (int b = 0; b < nb; b++)
@@ -87,13 +128,15 @@ static class Program
         double meanNmr = sumNmr / Math.Max(1, bandFrames);
         double audibleFrac = (double)audibleBandFrames / Math.Max(1, bandFrames);
         double audibleNmr = audibleBandFrames > 0 ? sumAudible / audibleBandFrames : 0.0;
+        double hfStab = hfCount > 0 ? Math.Sqrt(hfSum / hfCount) : 0.0;
         // Machine-readable. PRIMARY score first: meanNMRdb (aggregate noise-to-mask over all
         // band-frames; strongly monotone with bitrate, validated). Then audibleFrac (fraction
         // of band-frames with audible noise), audibleNMRdb (mean over audible bands only; noisy),
-        // maxNMRdb. Compare encodes of the SAME source at the SAME bitrate; lower meanNMRdb =
-        // more transparent.
-        Console.WriteLine(string.Format(CultureInfo.InvariantCulture, "{0:F4} {1:F5} {2:F4} {3:F4}",
-            meanNmr, audibleFrac, audibleNmr, maxNmr));
+        // maxNMRdb, hfStabDb (RMS frame-to-frame HF modulation error, the campaign-12 "swirl"
+        // meter; appended so existing field positions never move). Compare encodes of the SAME
+        // source at the SAME bitrate; lower meanNMRdb = more transparent.
+        Console.WriteLine(string.Format(CultureInfo.InvariantCulture, "{0:F4} {1:F5} {2:F4} {3:F4} {4:F4}",
+            meanNmr, audibleFrac, audibleNmr, maxNmr, hfStab));
         return 0;
     }
 

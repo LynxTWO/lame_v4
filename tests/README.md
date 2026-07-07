@@ -33,7 +33,12 @@ decoded WAV and measures how much coding noise sits **above** a masking threshol
 itself (critical-band energy + spreading + absolute threshold) - deliberately not LAME's own
 model, so improving LAME cannot trivially game the score. Primary output is `meanNMRdb`
 (lower = more transparent). Validated: it is monotone with bitrate (128k -3.5 -> 320k -15.3 dB
-on `music_mix`).
+on `music_mix`). Output fields: `meanNMRdb audibleFrac audibleNMRdb maxNMRdb hfStabDb`. The
+fifth is the campaign-12 temporal-stability ("swirl") meter: RMS difference of frame-to-frame
+HF log-energy deltas between original and decode, per 4-8/8-12/12-16 kHz range. It exists
+because a config can win every level-based field while a listener hears swirly, unstable HF
+texture (the campaign-11 demotion); acceptance was 5 of 5 on the listener's labeled fidelity
+pairs with benign ABX-null pairs an order of magnitude lower.
 
 `abtest.ps1` encodes the whole corpus with two `lame.exe` builds (A = reference, B = variant)
 at one setting, decodes both, and reports per-file and corpus-mean `meanNMRdb` plus delta.
