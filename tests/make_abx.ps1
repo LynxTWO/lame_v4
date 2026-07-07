@@ -140,6 +140,15 @@ if ((Test-Path $h10) -and (Test-Path $Measure)) {
             & $Lame --quiet --decode (Join-Path $Out "$t.mp3") (Join-Path $Out "$($t)_decoded.wav") 2>&1 | Out-Null
         }
         Write-Host ("Campaign 11 pair written (h10 VBR: stock {0:F1} kbps vs tuned {1:F1} kbps)." -f $kJ, $kK)
+        # J2: stock bisected to K's LANDED rate, not the nominal target. J landed 125.0 and
+        # K 119.2 (a bitrate cliff sits near 128 for h10), so J vs K confounds the tuning
+        # with a ~6 kbps size gap. J2 vs K is the controlled experiment: equal size to
+        # within the bisection tolerance, allocation is the only variable left.
+        $kJ2 = VbrBelowTarget $h10 '' (Join-Path $Out 'J2_stock_at_K_rate.mp3') $kK
+        if ($null -ne $kJ2) {
+            & $Lame --quiet --decode (Join-Path $Out 'J2_stock_at_K_rate.mp3') (Join-Path $Out 'J2_stock_at_K_rate_decoded.wav') 2>&1 | Out-Null
+            Write-Host ("Campaign 11 control written (J2: stock at {0:F2} kbps vs K's {1:F2})." -f $kJ2, $kK)
+        } else { Write-Host "Campaign 11 J2 control SKIPPED (bisection failed)." }
     } else { Write-Host "Campaign 11 h10 pair SKIPPED (bisection failed)." }
 } else {
     Write-Host "Campaign 11 h10 pair SKIPPED (needs tests/corpus_holdout/h10.wav and the podcast tool)."

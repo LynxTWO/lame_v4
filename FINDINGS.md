@@ -744,6 +744,42 @@ short-block thresholds nearly doubled (fewer short blocks). Both of those ride t
 search bounds, a known overfit signature, which is why the holdout table above carries
 the weight of the verdict and why the two SQAM flags stay open.
 
+#### Human ABX (2026-07-06)
+
+The campaign-11 winner is the first tuning change of this project a human has heard
+blind. Three sixteen-trial foobar2000 ABX sessions, logs archived in `tests/abx/`:
+
+| Pair | Material | Result | Verdict |
+| --- | --- | --- | --- |
+| J vs K | h10, stock 125.0 vs tuned 119.2 kbps | **16/16, p < 0.0001** | audibly different, but confounded by the 5.8 kbps size gap |
+| J2 vs K | h10, stock 119.14 vs tuned 119.16 kbps | **16/16, p < 0.0001** | **the tuning itself is audible at equal size** |
+| L vs M | SQAM 28, the worst audNMR flag, 127.9 vs 128.0 kbps | 9/16, p = 0.40 | no audible difference on the flagged worst case |
+
+J vs K rode a bitrate cliff: the at-or-below landing rule left the tuned side 5.8 kbps
+smaller, so a perfect score there could not separate the tuning from the missing bits.
+J2 was the control - stock bisected to the tuned side's landed rate, 0.02 kbps apart -
+and the difference survived at full strength, sixteen straight in under four minutes.
+
+Where the listener heard it: the cymbal swirl at 0:21.05-0:21.80 renders differently
+(stock smearier, tuned more phasey-swirly, neither close to the original), and the tuned
+side's bass is fuller where stock's is hollow - the four-campaign bass finding, heard
+blind. A windowed error check corroborates the where and sharpens the what: that region
+is the clip's hardest moment (the error floor rises ~8 dB over the surrounding second),
+while the two encodes' broadband error levels match within ~1-2 dB per 50 ms window. The
+ear detected error character - temporal and spectral shape - not error loudness.
+
+L vs M was the discipline test: SQAM 28 is the one holdout file where the winner's
+audible-band loudness rose most (+1.17 dB audNMR). The listener stress-listened both
+files repeatedly without finding any difference, then ran the formal trial anyway for
+the record: 9/16. Both open SQAM flags from the holdout table are now resolved as
+meter-visible, ear-invisible.
+
+ABX proves difference, not preference. The listener's sighted notes lean positive for
+the tuned side (bass preferred; the swirl a character trade with neither side close to
+the original), but that is not a blind preference result. The candidate stays opt-in;
+a forced-choice blind preference protocol is the follow-up if a default change is ever
+on the table.
+
 #### Status
 
 Five validated opt-in configurations, none a default change:
@@ -754,7 +790,7 @@ Five validated opt-in configurations, none a default change:
 | `-q 0 -b 320` | campaign-8 winner above | -1.81 / -2.81 |
 | `-q 0 --abr 192` | `--ns-bass -5.00 --shortthreshold 4.19,23.83` | -0.22 / -0.31 |
 | `--quality-max -b 128` | campaign-10 winner | -0.10 |
-| `-V` at 128 kbps measured | campaign-11 winner above | -0.86 / -2.47 |
+| `-V` at 128 kbps measured | campaign-11 winner above (ABX: **audibly different at equal size, 16/16**; preference open) | -0.86 / -2.47 |
 
 Campaign-1 winner: demoted, receipts above. Campaigns 2 through 5: rejected on holdouts and
 guardrails. Campaign 6: superseded by the bug it caught. Receipts:
@@ -939,7 +975,7 @@ look excellent right up until the material is unseen.
 | Finding 5: portfolio search | rejected; preserved behind `-DLAME_QMAX_PORTFOLIO` |
 | Finding 6 campaigns 1-7 | q0-128 candidate validated + ABX'd (no audible difference); campaigns 2-5 rejected; missing-tag trap caught and fixed |
 | Finding 6 campaigns 8-10 (per-rate) | three validated opt-in configs; CBR 320 at -1.81/-2.81 dB is the project's largest gain |
-| Finding 6 campaign 11 (VBR at equal measured size) | validated opt-in config: -2.47 dB library / -0.86 SQAM at equal 128 kbps, 16/16 h-files better; two VBR measurement traps caught and recorded |
+| Finding 6 campaign 11 (VBR at equal measured size) | validated opt-in config: -2.47 dB library / -0.86 SQAM at equal 128 kbps, 16/16 h-files better; ABX 16/16 at equal size, the first audible tuning change of the project; two VBR measurement traps caught and recorded |
 | Podcast optimizer v2 | landed; true VBR wins at equal measured bitrate |
 | Fractional ABR | landed, regress-gated |
 | Equal-measured-size harness | landed; first result: quality-max is a no-op for modern VBR |
@@ -952,7 +988,7 @@ look excellent right up until the material is unseen.
 | Item | Why it matters |
 | --- | --- |
 | A real quality-max VBR mode | the representation layer measured bit-minimal already (zero wins in 34,000 granules), and campaign 11 answered the psymodel side: the masking input to `block_sf` has real headroom (-2.47 dB library holdout at equal size). Still unexplored: the quantizer-side derivation itself (`find_scalefac_x34`'s distortion-target shape), now with a measured prize scale |
-| ABX the campaign-11 VBR winner | the largest-gain mode listeners actually use; SQAM tracks 28 (+1.17 audNMR) and 17 (+0.73) are the honest worst-case clips to test alongside the biggest wins |
+| Blind preference protocol for the campaign-11 winner | the difference is proven (16/16 at equal size); preference is the open question for any default-change decision. Sighted notes lean tuned (fuller bass) but the cymbal swirl is a character trade - a forced-choice blind preference run on bass-heavy and cymbal material decides |
 | Optional: focused short-clip ABX re-tests | looped short excerpts are sharper instruments than full dense tracks if a difference verdict is ever needed on small deltas |
 | Longer fuzz campaign | extend decoder safety coverage now that the harness is proven |
 

@@ -114,7 +114,31 @@ Both sides of each pair are bisected in fractional `-V` to the closest encode at
 the target can leave the two sides apart - on h10 the stock side landed 125.0 kbps and
 the tuned side 119.2 - but the at-or-below rule means the size gap can only handicap the
 candidate, never favor it: the tuned encode never has more data, sometimes noticeably
-less. SQAM 28 landed clean (127.9 vs 128.0). The candidate is the campaign-11 winner: bass and sfb21 masking
+less. SQAM 28 landed clean (127.9 vs 128.0).
+
+*(J vs K outcome 2026-07-06: **16/16, p < 0.0001 - the first audible tuning difference of
+the project**, a stronger blind result than Finding 1's fix. Log in this folder. The
+listener's notes: the cymbal swirl at 0:21.05-0:21.80 renders differently - J smearier, K
+more phasey-swirly, neither close to the original; K's bass fuller, J's hollow. A windowed
+error check confirms that region is the clip's hardest moment (error floor rises ~8 dB)
+and that J and K differ in error CHARACTER, not level - broadband error RMS matches within
+~1-2 dB. ABX proves difference, not preference; and this pair carried the 5.8 kbps size
+gap, so the difference is not yet attributable to the tuning alone.)*
+
+**The control pair - J2 vs K:** `J2_stock_at_K_rate` is stock bisected to K's landed rate
+(119.14 vs 119.16 kbps, a 0.02 kbps match). Equal size to the tolerance of the bisection,
+so allocation is the only variable left. If J2 vs K still ABXes, the tuning itself is
+audible; if the difference collapses, J vs K was hearing the size gap. This is the
+decisive test for the campaign-11 candidate.
+
+*(J2 vs K outcome 2026-07-06: **16/16, p < 0.0001 - the tuning itself is audible at equal
+size**, sixteen straight in under four minutes. The size-gap confound is eliminated; this
+is the first equal-size, human-audible tuning change of the project. Log in this folder.)*
+
+*(L vs M outcome 2026-07-06: after repeated familiarization passes found no audible
+difference anywhere, the listener ran the formal trial for the record: **9/16, p = 0.40 -
+null.** The +1.17 dB audNMR rise on SQAM 28, the campaign's worst-case flag, is
+meter-visible, ear-invisible. Log in this folder.)* The candidate is the campaign-11 winner: bass and sfb21 masking
 tightened, alto/treble relaxed slightly, fewer short blocks, ATH lowered. Holdout receipts:
 16 of 16 library files better (mean -2.47 dB), 60 of 64 equal-size SQAM files better
 (-0.86 dB), transients clean. 128 kbps VBR is NOT transparent territory - this is the pair

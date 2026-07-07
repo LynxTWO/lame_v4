@@ -1,0 +1,54 @@
+﻿foo_abx 2.2.3 report
+foobar2000 v2.25 preview 2025-08-26
+2026-07-06 21:53:47
+
+File A: J2_stock_at_K_rate_decoded.wav
+SHA1: b6c202170fa4e90efed074627a8f9da7479fe3ef
+File B: K_tunedvbr128_decoded.wav
+SHA1: a9516cabe7e43dbec5c36c1d0bb3ae4e52da5b47
+
+Output:
+Default : Speakers (AIR 192 6) [exclusive], 24-bit
+Crossfading: NO
+
+21:53:47 : Test started.
+21:54:44 : Test restarted.
+21:54:44 : 01/01
+21:54:54 : Test restarted.
+21:54:54 : 02/02
+21:55:03 : Test restarted.
+21:55:03 : 03/03
+21:55:13 : Test restarted.
+21:55:13 : 04/04
+21:55:23 : Test restarted.
+21:55:23 : 05/05
+21:55:33 : Test restarted.
+21:55:33 : 06/06
+21:55:44 : Test restarted.
+21:55:44 : 07/07
+21:56:00 : Test restarted.
+21:56:00 : 08/08
+21:56:09 : Test restarted.
+21:56:09 : 09/09
+21:56:20 : Test restarted.
+21:56:20 : 10/10
+21:56:34 : Test restarted.
+21:56:34 : 11/11
+21:56:46 : Test restarted.
+21:56:46 : 12/12
+21:56:54 : Test restarted.
+21:56:54 : 13/13
+21:57:07 : Test restarted.
+21:57:07 : 14/14
+21:57:23 : Test restarted.
+21:57:23 : 15/15
+21:57:37 : Test restarted.
+21:57:37 : 16/16
+21:57:37 : Test finished.
+
+ ---------- 
+Total: 16/16
+p-value: 0 (0%)
+
+ -- signature -- 
+b6cfc27e7d69a9d48c22b9fab5f089f5ba917334
