@@ -145,6 +145,20 @@ tightened, alto/treble relaxed slightly, fewer short blocks, ATH lowered. Holdou
 where an audible difference is most plausible of anything the tuning campaigns have
 produced.
 
+## Campaign 11 blind preference protocol (`pref/`)
+
+ABX settled *different*; this settles *preferred*. `tests/make_pref.ps1` writes five
+equal-size pairs (all within 0.03 kbps) into `tests/abx/pref/`: `P1..P5`, each `_A` /
+`_B` decodes plus the original, A/B assignment randomized per pair. Materials are the
+five holdout files with the campaign's largest measured improvements (h10, h13, h04,
+h14, h08).
+
+How to run it: for each pair, listen to A and B (against the original as much as you
+like) and record a verdict - **A, B, or no preference** - plus any notes, BEFORE opening
+`PREFERENCE_ANSWER_KEY_do_not_open.txt`. The key maps each pair to which side is the
+tuned encode and lists the landed rates. Five pairs is a small N by design; the result
+is recorded as blind preference evidence, not a significance claim.
+
 ## If you confirm it
 
 Finding 1 is already shipped. For Finding 3: v2 is opt-in and all objective guardrails passed,
