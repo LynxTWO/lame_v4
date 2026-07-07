@@ -775,11 +775,19 @@ files repeatedly without finding any difference, then ran the formal trial anywa
 the record: 9/16. Both open SQAM flags from the holdout table are now resolved as
 meter-visible, ear-invisible.
 
-ABX proves difference, not preference. The listener's sighted notes lean positive for
-the tuned side (bass preferred; the swirl a character trade with neither side close to
-the original), but that is not a blind preference result. The candidate stays opt-in;
-a forced-choice blind preference protocol is the follow-up if a default change is ever
-on the table.
+ABX proves difference, not preference, so a blind forced-choice preference protocol
+followed (2026-07-06, `tests/make_pref.ps1`): five equal-size pairs (within 0.03 kbps) on
+the five holdout files with the largest measured improvements, A/B randomized per pair,
+verdicts recorded before the key was opened. Result: **tuned preferred on 3 of 5, stock
+on 2 of 5 - chance (p = 0.5). No blind preference demonstrated in either direction.**
+The instructive detail: on h10, the same excerpt the listener ABX'd at 16/16 and
+sighted-preferred the tuned side's bass, the blind forced choice picked stock. The
+difference is real; the sighted preference did not survive blinding - the same lesson
+the qmax v1-vs-v2 session taught, now on the preference axis.
+
+The verdict pair for the campaign-11 candidate is therefore: audibly different at equal
+size (16/16), preference-neutral (3/5). It stays opt-in, and the case for any default
+change now requires material where the difference is not just detectable but preferred.
 
 #### Status
 
@@ -791,7 +799,7 @@ Five validated opt-in configurations, none a default change:
 | `-q 0 -b 320` | campaign-8 winner above | -1.81 / -2.81 |
 | `-q 0 --abr 192` | `--ns-bass -5.00 --shortthreshold 4.19,23.83` | -0.22 / -0.31 |
 | `--quality-max -b 128` | campaign-10 winner | -0.10 |
-| `-V` at 128 kbps measured | campaign-11 winner above (ABX: **audibly different at equal size, 16/16**; preference open) | -0.86 / -2.47 |
+| `-V` at 128 kbps measured | campaign-11 winner above (ABX: **audibly different at equal size, 16/16**; blind preference 3/5 = chance, neutral) | -0.86 / -2.47 |
 
 Campaign-1 winner: demoted, receipts above. Campaigns 2 through 5: rejected on holdouts and
 guardrails. Campaign 6: superseded by the bug it caught. Receipts:
@@ -1061,7 +1069,7 @@ look excellent right up until the material is unseen.
 | Item | Why it matters |
 | --- | --- |
 | Quality-max VBR at other rates | Finding 7 and campaign 11 were both validated at 128 kbps measured; `-V 2`-class rates (~190 kbps) should be spot-checked with the same equal-size harness before either is recommended there |
-| Blind preference protocol for the campaign-11 winner | the difference is proven (16/16 at equal size); preference is the open question for any default-change decision. Sighted notes lean tuned (fuller bass) but the cymbal swirl is a character trade - a forced-choice blind preference run on bass-heavy and cymbal material decides |
+| Material where the audible difference is also preferred | the campaign-11 difference is proven (16/16) but blind preference came back 3/5 = chance; a default change needs preferred, not just detectable. If candidate material ever emerges (dense bass program?), rerun the preference protocol there |
 | Optional: focused short-clip ABX re-tests | looped short excerpts are sharper instruments than full dense tracks if a difference verdict is ever needed on small deltas |
 | Longer fuzz campaign | extend decoder safety coverage now that the harness is proven |
 

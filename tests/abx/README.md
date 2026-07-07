@@ -159,6 +159,14 @@ like) and record a verdict - **A, B, or no preference** - plus any notes, BEFORE
 tuned encode and lists the landed rates. Five pairs is a small N by design; the result
 is recorded as blind preference evidence, not a significance claim.
 
+*(Outcome 2026-07-06: verdicts P1=B, P2=A, P3=A, P4=A, P5=A against a key of
+P1=A, P2=A, P3=B, P4=A, P5=A (tuned side) - **tuned preferred 3 of 5, stock 2 of 5,
+chance (p = 0.5). No blind preference either way.** On h10, the same excerpt ABX'd at
+16/16 with a sighted lean toward the tuned side's bass, the blind forced choice picked
+stock: the difference is real, the sighted preference did not survive blinding. The
+campaign-11 candidate's verdict pair: audibly different, preference-neutral - stays
+opt-in.)*
+
 ## If you confirm it
 
 Finding 1 is already shipped. For Finding 3: v2 is opt-in and all objective guardrails passed,
