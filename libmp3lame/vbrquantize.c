@@ -27,6 +27,8 @@
 #endif
 
 
+#include <stdlib.h>
+
 #include "lame.h"
 #include "machine.h"
 #include "encoder.h"
@@ -376,6 +378,173 @@ find_scalefac_x34(const FLOAT * xr, const FLOAT * xr34, FLOAT l3_xmin, unsigned 
         sf = sf_min;
     }
     return sf;
+}
+
+
+/* v4 quality-max VBR scalefactor search (Finding 6 follow-up).
+ *
+ * The stock search has two conservatisms that have never been measured for their
+ * perceptual payoff:
+ *   1. the tri predicate: a step size counts as clean only if it AND both
+ *      neighbors meet the distortion target - a 2001 robustness hack for running
+ *      an 8-step binary search over a non-monotone noise curve. It systematically
+ *      picks finer steps (more bits per band) than the target requires.
+ *   2. the binary search keeps the last clean step it happened to visit, not the
+ *      largest clean step that exists.
+ * These variants isolate the two effects. Selected only under cfg->quality_max
+ * (default -V stays byte-identical); LAME_VBRQ_FIND chooses the variant for the
+ * measurement sweep: 1 = binary search + plain predicate, 2 = exhaustive + plain,
+ * 3 = exhaustive + tri, 0/4 (default) = binary search + bi predicate.
+ * Measured verdicts (equal measured 128 kbps): variant 3 ties stock (the search
+ * was never the problem); variant 1 wins on music (-0.29 h-set) but regresses
+ * 61 of 70 SQAM files (the fluke check is load-bearing on tonal content);
+ * variant 2 overshoots (noise pushed exactly to the ceiling in every band).
+ */
+
+static  uint8_t
+find_scalefac_x34_bin_plain(const FLOAT * xr, const FLOAT * xr34, FLOAT l3_xmin,
+                            unsigned int bw, uint8_t sf_min)
+{
+    uint8_t sf = 128, sf_ok = 255, delsf = 128, seen_good_one = 0, i;
+    for (i = 0; i < 8; ++i) {
+        delsf >>= 1;
+        if (sf <= sf_min) {
+            sf += delsf;
+        }
+        else {
+            if (l3_xmin < calc_sfb_noise_x34(xr, xr34, bw, sf)) {
+                sf -= delsf;
+            }
+            else {
+                sf_ok = sf;
+                sf += delsf;
+                seen_good_one = 1;
+            }
+        }
+    }
+    if (seen_good_one > 0) {
+        sf = sf_ok;
+    }
+    if (sf <= sf_min) {
+        sf = sf_min;
+    }
+    return sf;
+}
+
+/* bi predicate: sf and its finer neighbor sf-1 must be clean. The finer-neighbor
+ * check keeps tri's lattice-fluke detector (a lone clean step inside a dirty
+ * neighborhood is a quantization-lattice accident, and those live on sparse tonal
+ * content - dropping ALL insurance regressed 61 of 70 SQAM files at equal size).
+ * What it drops is tri's sf+1 requirement, which by definition rejects the largest
+ * clean step (if one step coarser were clean the search would take it) and is
+ * therefore a pure one-step-finer bit tax. */
+static  uint8_t
+tri_calc_sfb_noise_x34_bi(const FLOAT * xr, const FLOAT * xr34, FLOAT l3_xmin, unsigned int bw,
+                          uint8_t sf, calc_noise_cache_t * did_it)
+{
+    if (did_it[sf].valid == 0) {
+        did_it[sf].valid = 1;
+        did_it[sf].value = calc_sfb_noise_x34(xr, xr34, bw, sf);
+    }
+    if (l3_xmin < did_it[sf].value) {
+        return 1;
+    }
+    if (sf > 0) {
+        uint8_t const sf_x = sf - 1;
+        if (did_it[sf_x].valid == 0) {
+            did_it[sf_x].valid = 1;
+            did_it[sf_x].value = calc_sfb_noise_x34(xr, xr34, bw, sf_x);
+        }
+        if (l3_xmin < did_it[sf_x].value) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static  uint8_t
+find_scalefac_x34_bin_bi(const FLOAT * xr, const FLOAT * xr34, FLOAT l3_xmin,
+                         unsigned int bw, uint8_t sf_min)
+{
+    calc_noise_cache_t did_it[256];
+    uint8_t sf = 128, sf_ok = 255, delsf = 128, seen_good_one = 0, i;
+    memset(did_it, 0, sizeof(did_it));
+    for (i = 0; i < 8; ++i) {
+        delsf >>= 1;
+        if (sf <= sf_min) {
+            sf += delsf;
+        }
+        else {
+            if (tri_calc_sfb_noise_x34_bi(xr, xr34, l3_xmin, bw, sf, did_it)) {
+                sf -= delsf;
+            }
+            else {
+                sf_ok = sf;
+                sf += delsf;
+                seen_good_one = 1;
+            }
+        }
+    }
+    if (seen_good_one > 0) {
+        sf = sf_ok;
+    }
+    if (sf <= sf_min) {
+        sf = sf_min;
+    }
+    return sf;
+}
+
+static  uint8_t
+find_scalefac_x34_exh_plain(const FLOAT * xr, const FLOAT * xr34, FLOAT l3_xmin,
+                            unsigned int bw, uint8_t sf_min)
+{
+    int     sf;
+    for (sf = 255; sf > sf_min; --sf) {
+        if (calc_sfb_noise_x34(xr, xr34, bw, (uint8_t) sf) <= l3_xmin) {
+            return (uint8_t) sf; /* the true largest (bit-cheapest) clean step */
+        }
+    }
+    /* no clean step exists: the finest available step is the least distorted */
+    return sf_min;
+}
+
+static  uint8_t
+find_scalefac_x34_exh_tri(const FLOAT * xr, const FLOAT * xr34, FLOAT l3_xmin,
+                          unsigned int bw, uint8_t sf_min)
+{
+    calc_noise_cache_t did_it[256];
+    int     sf;
+    memset(did_it, 0, sizeof(did_it));
+    for (sf = 255; sf > sf_min; --sf) {
+        if (!tri_calc_sfb_noise_x34(xr, xr34, l3_xmin, bw, (uint8_t) sf, did_it)) {
+            return (uint8_t) sf;
+        }
+    }
+    return sf_min;
+}
+
+/* experiment harness only: cached env read; selection happens on the main thread
+ * in VBR_encode_frame before any quantization workers start */
+static int
+vbrq_find_variant(void)
+{
+    static int cached = -2;
+    if (cached == -2) {
+        char const *env = getenv("LAME_VBRQ_FIND");
+        cached = env ? atoi(env) : 0;
+    }
+    return cached;
+}
+
+static find_sf_f
+qmax_find_sf(void)
+{
+    switch (vbrq_find_variant()) {
+    case 1:  return find_scalefac_x34_bin_plain;
+    case 2:  return find_scalefac_x34_exh_plain;
+    case 3:  return find_scalefac_x34_exh_tri;
+    default: return find_scalefac_x34_bin_bi; /* 0/4: margin dropped, fluke check kept */
+    }
 }
 
 
@@ -1280,7 +1449,10 @@ VBR_encode_frame(lame_internal_flags * gfc, const FLOAT xr34orig[2][2][576],
             use_nbits_ch[gr][ch] = 0;
             max_nbits_gr[gr] += max_bits[gr][ch];
             max_nbits_fr += max_bits[gr][ch];
-            that_[gr][ch].find = (cfg->full_outer_loop < 0) ? guess_scalefac_x34 : find_scalefac_x34;
+            if (cfg->quality_max)
+                that_[gr][ch].find = qmax_find_sf();
+            else
+                that_[gr][ch].find = (cfg->full_outer_loop < 0) ? guess_scalefac_x34 : find_scalefac_x34;
             that_[gr][ch].gfc = gfc;
             that_[gr][ch].cod_info = &gfc->l3_side.tt[gr][ch];
             that_[gr][ch].xr34orig = xr34orig[gr][ch];

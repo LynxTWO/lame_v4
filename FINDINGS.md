@@ -239,9 +239,10 @@ per-band step targets to one legal (gain, scale, preflag) representation by fixe
 preference; a quality-max search over gain-parity alternatives (rebuild scalefactors at
 gain +1..3, accept only representations finer-or-equal than every band target, keep the
 fewest measured bits) scored **zero wins in 34,000 granules**. The 2012-era constrain
-logic already lands bit-minimal representations. Rejected and reverted; a real quality-max
-VBR mode would have to change the distortion-target derivation itself (`block_sf` /
-`find_scalefac_x34`), which is open work with an unknown prize.
+logic already lands bit-minimal representations. Rejected and reverted. The remaining
+surface, the distortion-target derivation itself (`block_sf` / `find_scalefac_x34`), was
+opened next and paid: Finding 7 gives `--quality-max` its real VBR meaning (-0.43 dB on
+the library holdout at equal measured size).
 
 Safety receipt: purely additive, bit-exact gate 70/70 green for every existing setting.
 
@@ -798,6 +799,77 @@ guardrails. Campaign 6: superseded by the bug it caught. Receipts:
 
 ---
 
+### Finding 7. The VBR scalefactor search pays a measured bit tax for 2001-era insurance. `--quality-max` now removes the part that buys nothing.
+
+Every `-V` encode since 2001 spends roughly 8% of its bits on a safety margin the
+distortion targets never asked for. Removing just that margin, and letting the equal-size
+renormalization respend the bits, measures **-0.43 dB on the library holdout (15 of 16
+files better) and flat on SQAM** at equal measured 128 kbps. This is the delivered answer
+to the "real quality-max VBR mode" question: `--quality-max` under `-V` now selects the
+corrected search, is byte-identical to stock without the flag (bit-exact gate 70 of 70),
+and costs nothing at encode time.
+
+#### The mechanism, decomposed
+
+`find_scalefac_x34` (vbrquantize.c) picks each band's quantization step by binary search,
+accepting a step only if the tri predicate holds: the step AND both neighbors must meet
+the band's distortion target. That bundles two different protections, and four variants
+(env `LAME_VBRQ_FIND`, quality-max only) isolated them at equal measured size:
+
+| Variant | Search | Predicate | t01 `-V4` bytes | Verdict at equal 128 kbps |
+| --- | --- | --- | --- | --- |
+| stock | binary | tri (sf-1, sf, sf+1) | 554,375 | reference |
+| 3 | exhaustive | tri | ~stock | ties stock: the binary search was never the problem |
+| 1 | binary | plain (sf only) | 505,864 | music wins (-0.39 val) but 61 of 70 SQAM files regress |
+| 2 | exhaustive | plain | 495,077 | overshoots: noise pushed exactly to the ceiling in every band, worst file +1.02 |
+| 4 | binary | bi (sf-1, sf) | 511,915 | **winner: music wins kept, SQAM regression gone** |
+
+The decomposition reads directly off those rows. Requiring sf+1 (one step coarser) clean
+rejects the largest clean step by definition - it is a deliberate one-step-finer bit
+margin, about 8% of the file, and variant 1 shows the targets themselves never needed it.
+Requiring sf-1 (one step finer) clean is a lattice-fluke detector: a lone "clean" step
+whose finer neighbor is dirty is a quantization-lattice accident, and variant 1 vs 4
+shows exactly where those accidents live - sparse tonal material (61 of 70 SQAM files
+regressed without the check, a balanced 31/37 scatter around zero with it). Variant 2
+shows the search's residual one-notch timidity is itself load-bearing: taking the true
+largest clean step everywhere leaves no slack and the meter punishes it.
+
+#### Variant 4 verdicts
+
+All at equal measured 128 kbps via `tests/validate_vbr.ps1 -Cfg "--quality-max"`:
+
+| Corpus | Files better | Mean NMR delta | audNMR mean / worst file |
+| --- | --- | --- | --- |
+| val (12) | 11 of 12 | -0.572 dB | +0.187 / +0.502 |
+| train (36) | 27 of 36 | -0.404 dB | +0.118 / +0.494 |
+| library h-set (16) | **15 of 16** | **-0.425 dB** | +0.182 / +0.263 |
+| SQAM (70) | 31 of 70, 37 worse, 2 tie | +0.029 dB | -0.017 / +0.292 |
+
+Transient gate (castanets, triangle, xylophone, h06, h16): no trashing; every pre-echo
+difference is sub-dB at -47 to -97 dB absolute depths, and the high-frequency error
+IMPROVES on xylophone (0.25 vs 0.47) and h16 (0.05 vs 0.24).
+
+The honest caveat: audNMR drifts up on music (+0.18 mean on the h-set) - the
+fewer-but-louder direction in miniature. It is an order of magnitude below what got
+campaigns 3 and 5 rejected (+2 to +4 dB), and below the +1.17 dB that a formal ABX on
+SQAM 28 just measured as inaudible (campaign 11, L vs M, 9/16), but it is recorded here
+and not smoothed over.
+
+Stacking with the campaign-11 psymodel config adds nothing: flags alone -2.468 on the
+h-set, flags plus variant 4 -2.466. The two mechanisms harvest overlapping headroom, and
+the flags config already collects it. Variant 4's value is for plain `--quality-max -V`
+use, where it needs no opt-in tuning flags.
+
+#### Status
+
+Merged behind `--quality-max` (VBR path only; CBR/ABR quality-max is untouched, and
+without the flag every encode is byte-identical to stock - gate 70 of 70 both ways).
+`LAME_VBRQ_FIND` stays as the measurement harness for the other three variants. Not a
+default change: the audNMR drift and the SQAM 37-file scatter are meter-scale, but the
+project ships defaults only on audible receipts.
+
+---
+
 ### Finding 0 (minor). Re-enabling the in-loop Huffman search.
 
 Stock `-q0` disables its own thorough Huffman sub-search purely for speed; its source
@@ -853,7 +925,7 @@ measured average bitrate lands in `[target - 0.5, target]`, then scores both sid
 meter at matched measured size. `tools/podcast --measure` exposes the MPEG frame walker it
 depends on. Its first result was decisive: stock VBR and `--quality-max` VBR, bisected to
 matched bitrates, produce byte-identical files on every holdout track (see Finding 2). The
-flag is unwired for the modern VBR path, not mis-tuned.
+flag was unwired for the modern VBR path, not mis-tuned - true until Finding 7 wired it.
 
 ### Adaptive reservoir factor: tested, null
 
@@ -976,9 +1048,10 @@ look excellent right up until the material is unseen.
 | Finding 6 campaigns 1-7 | q0-128 candidate validated + ABX'd (no audible difference); campaigns 2-5 rejected; missing-tag trap caught and fixed |
 | Finding 6 campaigns 8-10 (per-rate) | three validated opt-in configs; CBR 320 at -1.81/-2.81 dB is the project's largest gain |
 | Finding 6 campaign 11 (VBR at equal measured size) | validated opt-in config: -2.47 dB library / -0.86 SQAM at equal 128 kbps, 16/16 h-files better; ABX 16/16 at equal size, the first audible tuning change of the project; two VBR measurement traps caught and recorded |
+| Finding 7: quality-max VBR scalefactor search | merged; the tri predicate's one-step-finer margin (~8% of bits) removed, its lattice-fluke check kept; -0.43 dB library holdout at equal 128 kbps, SQAM flat, transients clean; not additive with the campaign-11 flags |
 | Podcast optimizer v2 | landed; true VBR wins at equal measured bitrate |
 | Fractional ABR | landed, regress-gated |
-| Equal-measured-size harness | landed; first result: quality-max is a no-op for modern VBR |
+| Equal-measured-size harness | landed; first result: quality-max was a no-op for modern VBR (resolved by Finding 7) |
 | Adaptive `res_factor` (year-2000 TODO) | tested, null: ABR undershoot is demand-limited; reverted |
 | CMake build | bit-identical to nmake baseline on MSVC |
 | CI + fuzz + docs lint | live and green at LynxTWO/lame_v4 |
@@ -987,7 +1060,7 @@ look excellent right up until the material is unseen.
 
 | Item | Why it matters |
 | --- | --- |
-| A real quality-max VBR mode | the representation layer measured bit-minimal already (zero wins in 34,000 granules), and campaign 11 answered the psymodel side: the masking input to `block_sf` has real headroom (-2.47 dB library holdout at equal size). Still unexplored: the quantizer-side derivation itself (`find_scalefac_x34`'s distortion-target shape), now with a measured prize scale |
+| Quality-max VBR at other rates | Finding 7 and campaign 11 were both validated at 128 kbps measured; `-V 2`-class rates (~190 kbps) should be spot-checked with the same equal-size harness before either is recommended there |
 | Blind preference protocol for the campaign-11 winner | the difference is proven (16/16 at equal size); preference is the open question for any default-change decision. Sighted notes lean tuned (fuller bass) but the cymbal swirl is a character trade - a forced-choice blind preference run on bass-heavy and cymbal material decides |
 | Optional: focused short-clip ABX re-tests | looped short excerpts are sharper instruments than full dense tracks if a difference verdict is ever needed on small deltas |
 | Longer fuzz campaign | extend decoder safety coverage now that the harness is proven |
