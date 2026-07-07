@@ -778,7 +778,9 @@ meter-visible, ear-invisible.
 ABX proves difference, not preference, so a blind forced-choice preference protocol
 followed (2026-07-06, `tests/make_pref.ps1`): five equal-size pairs (within 0.03 kbps) on
 the five holdout files with the largest measured improvements, A/B randomized per pair,
-verdicts recorded before the key was opened. Result: **tuned preferred on 3 of 5, stock
+verdicts recorded before the key was opened. Protocol note: the listener compared each
+pair head-to-head only, without referencing the originals - so this measures unanchored
+pleasantness, not fidelity to the source. Result: **tuned preferred on 3 of 5, stock
 on 2 of 5 - chance (p = 0.5). No blind preference demonstrated in either direction.**
 The instructive detail: on h10, the same excerpt the listener ABX'd at 16/16 and
 sighted-preferred the tuned side's bass, the blind forced choice picked stock. The
@@ -786,8 +788,11 @@ difference is real; the sighted preference did not survive blinding - the same l
 the qmax v1-vs-v2 session taught, now on the preference axis.
 
 The verdict pair for the campaign-11 candidate is therefore: audibly different at equal
-size (16/16), preference-neutral (3/5). It stays opt-in, and the case for any default
-change now requires material where the difference is not just detectable but preferred.
+size (16/16), preference-neutral head-to-head (3/5). It stays opt-in, and the case for
+any default change now requires material where the difference is not just detectable but
+preferred. One sharper optional instrument remains unused: an anchored round asking
+"which of A/B is closer to the original?" - a fidelity judgment rather than a
+pleasantness one, and the criterion a codec default should arguably answer to.
 
 #### Status
 

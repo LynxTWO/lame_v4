@@ -161,11 +161,14 @@ is recorded as blind preference evidence, not a significance claim.
 
 *(Outcome 2026-07-06: verdicts P1=B, P2=A, P3=A, P4=A, P5=A against a key of
 P1=A, P2=A, P3=B, P4=A, P5=A (tuned side) - **tuned preferred 3 of 5, stock 2 of 5,
-chance (p = 0.5). No blind preference either way.** On h10, the same excerpt ABX'd at
-16/16 with a sighted lean toward the tuned side's bass, the blind forced choice picked
-stock: the difference is real, the sighted preference did not survive blinding. The
-campaign-11 candidate's verdict pair: audibly different, preference-neutral - stays
-opt-in.)*
+chance (p = 0.5). No blind preference either way.** Protocol note: the listener compared
+each pair head-to-head only, without the originals - an unanchored pleasantness
+preference, not a fidelity judgment. On h10, the same excerpt ABX'd at 16/16 with a
+sighted lean toward the tuned side's bass, the blind forced choice picked stock: the
+difference is real, the sighted preference did not survive blinding. The campaign-11
+candidate's verdict pair: audibly different, preference-neutral head-to-head - stays
+opt-in. Optional sharper round if ever wanted: anchored fidelity, "which of A/B is
+closer to the original?" using the P*_original.wav files already in the package.)*
 
 ## If you confirm it
 
