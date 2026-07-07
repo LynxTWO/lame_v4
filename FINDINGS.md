@@ -787,16 +787,46 @@ sighted-preferred the tuned side's bass, the blind forced choice picked stock. T
 difference is real; the sighted preference did not survive blinding - the same lesson
 the qmax v1-vs-v2 session taught, now on the preference axis.
 
-The verdict pair for the campaign-11 candidate is therefore: audibly different at equal
-size (16/16), preference-neutral head-to-head (3/5). It stays opt-in, and the case for
-any default change now requires material where the difference is not just detectable but
-preferred. One sharper optional instrument remains unused: an anchored round asking
-"which of A/B is closer to the original?" - a fidelity judgment rather than a
-pleasantness one, and the criterion a codec default should arguably answer to.
+The anchored round followed (same five pairs, same sealed key, verdicts recorded before
+reopening it): "which of A or B is closer to the original?" Result: **stock judged
+closer on 5 of 5 pairs (p = 0.031)**. The listener's notes name the same percept
+independently across pairs: the tuned side is "swirly in the edges of the highs on
+layered vocals" (h13) and loses "stability in the quiet background cymbals" - "that
+P4_A simply doesn't have" (h14), "just a tad more stability on the cymbals" for stock
+(h08). This **inverts the meter**: on these same five files the config measures 2.5 to
+3.5 dB better mean NMR at equal size, yet a careful listener judges every one less
+faithful to the source.
+
+The percept maps onto the config's own knobs. The winner nearly doubles the short-block
+thresholds (8.45,47.99 vs stock 4.4,25): cymbal-wash and layered-vocal-air content that
+used to trigger short blocks stays in long blocks, and the resulting temporal smear of
+sustained high-frequency texture is exactly "swirly" and "unstable". It slipped every
+guardrail because none of them watches that axis: mean NMR and audNMR are
+frame-averaged levels, and the transient gate measures onset pre-echo, not the
+stability of sustained textures between onsets.
+
+Consequences, recorded:
+
+1. **The campaign-11 configuration is demoted**: from validated opt-in candidate to
+   measured-but-fidelity-rejected. The meter numbers above stand as measurements; the
+   recommendation does not survive an anchored human fidelity test on the config's own
+   best material.
+2. The campaign-3 lesson returns one level deeper: the fitness plus audNMR plus
+   onset-pre-echo guardrails still under-constrain the temporal stability of sustained
+   HF texture. Any campaign 12 on this surface needs a temporal-stability guardrail
+   (frame-to-frame HF error variance, or a modulation-spectrum error term) and capped
+   short-block-threshold bounds.
+3. This is the first time the listening program overturned the meter, and it is the
+   project's clearest validation of its own shipping rule: on meter receipts alone this
+   config was five-for-five validated; it would have shipped a fidelity regression.
+
+Complete human verdict for the campaign-11 candidate: audibly different at equal size
+(16/16), head-to-head pleasantness neutral (3/5), **anchored fidelity 0/5 - stock wins
+unanimously**.
 
 #### Status
 
-Five validated opt-in configurations, none a default change:
+Four validated opt-in configurations, none a default change:
 
 | Mode | Configuration | Holdout gain |
 | --- | --- | --- |
@@ -804,11 +834,13 @@ Five validated opt-in configurations, none a default change:
 | `-q 0 -b 320` | campaign-8 winner above | -1.81 / -2.81 |
 | `-q 0 --abr 192` | `--ns-bass -5.00 --shortthreshold 4.19,23.83` | -0.22 / -0.31 |
 | `--quality-max -b 128` | campaign-10 winner | -0.10 |
-| `-V` at 128 kbps measured | campaign-11 winner above (ABX: **audibly different at equal size, 16/16**; blind preference 3/5 = chance, neutral) | -0.86 / -2.47 |
 
-Campaign-1 winner: demoted, receipts above. Campaigns 2 through 5: rejected on holdouts and
-guardrails. Campaign 6: superseded by the bug it caught. Receipts:
-`tests/autotune_q0_cbr128.csv` through `autotune11_vbr128.csv`.
+The campaign-11 winner is **demoted** (2026-07-06): audibly different at equal size (ABX
+16/16), but an anchored blind fidelity round judged stock closer to the original on 5 of
+5 pairs - the meter numbers stand as measurements, the recommendation does not. Receipts
+in the Human ABX subsection above. Campaign-1 winner: demoted, receipts above. Campaigns
+2 through 5: rejected on holdouts and guardrails. Campaign 6: superseded by the bug it
+caught. Receipts: `tests/autotune_q0_cbr128.csv` through `autotune11_vbr128.csv`.
 
 ---
 
@@ -879,7 +911,11 @@ Merged behind `--quality-max` (VBR path only; CBR/ABR quality-max is untouched, 
 without the flag every encode is byte-identical to stock - gate 70 of 70 both ways).
 `LAME_VBRQ_FIND` stays as the measurement harness for the other three variants. Not a
 default change: the audNMR drift and the SQAM 37-file scatter are meter-scale, but the
-project ships defaults only on audible receipts.
+project ships defaults only on audible receipts. Note the epistemic status after the
+campaign-11 demotion: Finding 7's evidence is meter-only. Its mechanism does not touch
+block switching (the axis the anchored fidelity round caught), but no anchored human
+test has been run on it either - that test is the bar before this mode is ever
+recommended beyond experimentation.
 
 ---
 
@@ -1060,7 +1096,7 @@ look excellent right up until the material is unseen.
 | Finding 5: portfolio search | rejected; preserved behind `-DLAME_QMAX_PORTFOLIO` |
 | Finding 6 campaigns 1-7 | q0-128 candidate validated + ABX'd (no audible difference); campaigns 2-5 rejected; missing-tag trap caught and fixed |
 | Finding 6 campaigns 8-10 (per-rate) | three validated opt-in configs; CBR 320 at -1.81/-2.81 dB is the project's largest gain |
-| Finding 6 campaign 11 (VBR at equal measured size) | validated opt-in config: -2.47 dB library / -0.86 SQAM at equal 128 kbps, 16/16 h-files better; ABX 16/16 at equal size, the first audible tuning change of the project; two VBR measurement traps caught and recorded |
+| Finding 6 campaign 11 (VBR at equal measured size) | winner DEMOTED: -2.47 dB library at equal 128 kbps and ABX 16/16 (first audible tuning change of the project), but anchored blind fidelity went 5/5 to stock - the first time the listening program overturned the meter; two VBR measurement traps caught and recorded |
 | Finding 7: quality-max VBR scalefactor search | merged; the tri predicate's one-step-finer margin (~8% of bits) removed, its lattice-fluke check kept; -0.43 dB library holdout at equal 128 kbps, SQAM flat, transients clean; not additive with the campaign-11 flags |
 | Podcast optimizer v2 | landed; true VBR wins at equal measured bitrate |
 | Fractional ABR | landed, regress-gated |
@@ -1074,7 +1110,7 @@ look excellent right up until the material is unseen.
 | Item | Why it matters |
 | --- | --- |
 | Quality-max VBR at other rates | Finding 7 and campaign 11 were both validated at 128 kbps measured; `-V 2`-class rates (~190 kbps) should be spot-checked with the same equal-size harness before either is recommended there |
-| Material where the audible difference is also preferred | the campaign-11 difference is proven (16/16) but blind preference came back 3/5 = chance; a default change needs preferred, not just detectable. If candidate material ever emerges (dense bass program?), rerun the preference protocol there |
+| Campaign 12: temporal-stability guardrail | the campaign-11 demotion showed the fitness family (mean NMR + per-file audNMR + onset pre-echo) under-constrains sustained-HF temporal stability - "swirly highs, unstable quiet cymbals" slipped every gate. Design: add a frame-to-frame HF error-variance (or modulation-spectrum) term to the veto, cap short-block-threshold bounds at stock, rerun the -V search |
 | Optional: focused short-clip ABX re-tests | looped short excerpts are sharper instruments than full dense tracks if a difference verdict is ever needed on small deltas |
 | Longer fuzz campaign | extend decoder safety coverage now that the harness is proven |
 

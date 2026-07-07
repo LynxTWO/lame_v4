@@ -159,16 +159,19 @@ like) and record a verdict - **A, B, or no preference** - plus any notes, BEFORE
 tuned encode and lists the landed rates. Five pairs is a small N by design; the result
 is recorded as blind preference evidence, not a significance claim.
 
-*(Outcome 2026-07-06: verdicts P1=B, P2=A, P3=A, P4=A, P5=A against a key of
-P1=A, P2=A, P3=B, P4=A, P5=A (tuned side) - **tuned preferred 3 of 5, stock 2 of 5,
-chance (p = 0.5). No blind preference either way.** Protocol note: the listener compared
-each pair head-to-head only, without the originals - an unanchored pleasantness
-preference, not a fidelity judgment. On h10, the same excerpt ABX'd at 16/16 with a
-sighted lean toward the tuned side's bass, the blind forced choice picked stock: the
-difference is real, the sighted preference did not survive blinding. The campaign-11
-candidate's verdict pair: audibly different, preference-neutral head-to-head - stays
-opt-in. Optional sharper round if ever wanted: anchored fidelity, "which of A/B is
-closer to the original?" using the P*_original.wav files already in the package.)*
+*(Outcome 2026-07-06, round 1 - head-to-head, no original anchor: verdicts P1=B, P2=A,
+P3=A, P4=A, P5=A against a key of P1=A, P2=A, P3=B, P4=A, P5=A (tuned side) - tuned
+preferred 3 of 5, chance (p = 0.5), no pleasantness preference either way. On h10, the
+same excerpt ABX'd at 16/16 with a sighted lean toward the tuned side's bass, the blind
+forced choice picked stock: the sighted preference did not survive blinding.)*
+
+*(Outcome 2026-07-06, round 2 - anchored fidelity, "which of A/B is closer to the
+original?": verdicts P1=B, P2=B, P3=A, P4=B, P5=B - **stock judged closer on 5 of 5
+pairs, p = 0.031.** Listener notes, consistent across pairs: the tuned side is "swirly
+in the edges of the highs on layered vocals" (h13) and loses "stability in the quiet
+background cymbals" (h14, h08). This inverted the meter's -2.5 to -3.5 dB verdict on the
+same files and **demoted the campaign-11 config** - the percept maps onto its doubled
+short-block thresholds, an axis no guardrail watched. See FINDINGS campaign 11.)*
 
 ## If you confirm it
 
