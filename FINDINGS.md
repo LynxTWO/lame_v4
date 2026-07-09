@@ -867,9 +867,25 @@ the stability column):
 
 The honest flag: h14's stability rises +0.226, and the anchored round demonstrated this
 listener can catch deltas of +0.15 (and arguably +0.06) on exactly this kind of
-material. So the winner's status is meter-validated with the gate clean on its own val
-material, and the anchored fidelity round (package regenerated in `tests/abx/pref12/`)
-is the bar before it is recommended - the same bar Finding 7 carries.
+material. So the winner's status was meter-validated pending human ears on that file.
+
+#### Human ABX (2026-07-09)
+
+The flag resolved in the winner's favor. Two sixteen-trial sessions on the regenerated
+pairs, logs archived:
+
+| Pair | Material | Result | Verdict |
+| --- | --- | --- | --- |
+| P4 | h14, the stability-flagged file (127.92 vs 127.89 kbps) | 7/16, p = 0.77 | no audible difference where the risk was flagged |
+| P2 | h13, the campaign-11 "swirly vocal edges" file | 10/16, p = 0.23 | no audible difference |
+
+The contrast with the demoted config, on the same material and the same listener: the
+campaign-11 dose was 16 of 16 audibly different and 5 of 5 less faithful; the
+campaign-12 dose is indistinguishable from stock exactly where its residual stability
+delta was largest. An anchored fidelity round is moot on pairs the listener cannot tell
+apart, so the winner's status closes as **validated opt-in**: meter-visible,
+ear-invisible - the same profile as every legitimately validated config in this
+project, now with the stability gate standing behind it.
 
 One physics revision, scoped to what was measured: the bass direction is now confirmed a
 fifth independent time, but campaign 12 shows the meter-optimal dose overshoots what
@@ -881,8 +897,7 @@ treats it as beyond question.
 
 #### Status
 
-Four validated opt-in configurations plus one stability-gated candidate, none a default
-change:
+Five validated opt-in configurations, none a default change:
 
 | Mode | Configuration | Holdout gain |
 | --- | --- | --- |
@@ -890,7 +905,7 @@ change:
 | `-q 0 -b 320` | campaign-8 winner above | -1.81 / -2.81 |
 | `-q 0 --abr 192` | `--ns-bass -5.00 --shortthreshold 4.19,23.83` | -0.22 / -0.31 |
 | `--quality-max -b 128` | campaign-10 winner | -0.10 |
-| `-V` at 128 kbps measured | `--ns-bass -1.50` (campaign 12, stability-gated; anchored fidelity round pending) | -0.25 / -0.31 |
+| `-V` at 128 kbps measured | `--ns-bass -1.50` (campaign 12, stability-gated; ABX: no audible difference on the flagged pairs) | -0.25 / -0.31 |
 
 The campaign-11 winner is **demoted** (2026-07-06): audibly different at equal size (ABX
 16/16), but an anchored blind fidelity round judged stock closer to the original on 5 of
@@ -1154,7 +1169,7 @@ look excellent right up until the material is unseen.
 | Finding 6 campaigns 1-7 | q0-128 candidate validated + ABX'd (no audible difference); campaigns 2-5 rejected; missing-tag trap caught and fixed |
 | Finding 6 campaigns 8-10 (per-rate) | three validated opt-in configs; CBR 320 at -1.81/-2.81 dB is the project's largest gain |
 | Finding 6 campaign 11 (VBR at equal measured size) | winner DEMOTED: -2.47 dB library at equal 128 kbps and ABX 16/16 (first audible tuning change of the project), but anchored blind fidelity went 5/5 to stock - the first time the listening program overturned the meter; two VBR measurement traps caught and recorded |
-| Finding 6 campaign 12 (stability-gated rerun) | the listener's fidelity verdicts became a meter (nmr field 5, hfStabDb; acceptance 5/5 on the labeled pairs) and a veto head (canary: the demoted config now rejects at 16x the cap); winner `--ns-bass -1.50` improves 82 of 83 holdout files at equal 128 kbps (-0.31/-0.25), anchored round pending |
+| Finding 6 campaign 12 (stability-gated rerun) | the listener's fidelity verdicts became a meter (nmr field 5, hfStabDb; acceptance 5/5 on the labeled pairs) and a veto head (canary: the demoted config now rejects at 16x the cap); winner `--ns-bass -1.50` improves 82 of 83 holdout files at equal 128 kbps (-0.31/-0.25); ABX null on the flagged pairs (7/16 on h14, 10/16 on h13) - validated opt-in |
 | Finding 7: quality-max VBR scalefactor search | merged; the tri predicate's one-step-finer margin (~8% of bits) removed, its lattice-fluke check kept; -0.43 dB library holdout at equal 128 kbps, SQAM flat, transients clean; not additive with the campaign-11 flags |
 | Podcast optimizer v2 | landed; true VBR wins at equal measured bitrate |
 | Fractional ABR | landed, regress-gated |
@@ -1168,7 +1183,7 @@ look excellent right up until the material is unseen.
 | Item | Why it matters |
 | --- | --- |
 | Quality-max VBR at other rates | Finding 7 and campaign 11 were both validated at 128 kbps measured; `-V 2`-class rates (~190 kbps) should be spot-checked with the same equal-size harness before either is recommended there |
-| Anchored fidelity rounds: campaign-12 winner and Finding 7 | both are meter-validated only; `tests/abx/pref12/` holds the regenerated five-pair package for the campaign-12 winner (h14 is the pair to hammer - its stability delta +0.226 sits in the range the listener has demonstrated hearing). Finding 7 needs its own package before any recommendation |
+| Anchored fidelity round: Finding 7 | the campaign-12 winner's round is resolved (ABX null on the flagged pairs, 2026-07-09); Finding 7 remains meter-only and needs its own package before any recommendation |
 | Stability spot-check of the campaign-7 CBR 128 config | its `--ns-bass -2.50` dose exceeds the fidelity-audited -1.50 found at 128 VBR; one validate run with the stability column settles whether the CBR context behaves differently |
 | Optional: focused short-clip ABX re-tests | looped short excerpts are sharper instruments than full dense tracks if a difference verdict is ever needed on small deltas |
 | Longer fuzz campaign | extend decoder safety coverage now that the harness is proven |

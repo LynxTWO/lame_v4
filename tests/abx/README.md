@@ -185,6 +185,13 @@ win there would be despite fewer bits, which is stronger evidence. P3 and P4 are
 matches. Record verdicts (closer to the original: A, B, or no call) before opening the
 key.
 
+*(Outcome 2026-07-09: ABX on the two riskiest pairs - **P4/h14: 7/16, p = 0.77; P2/h13:
+10/16, p = 0.23. No audible difference on either**, including the file where the winner's
+stability delta sat inside the listener's demonstrated detection range. The same listener
+scored 16/16 on the campaign-11 dose over this material. An anchored fidelity round is
+moot on indistinguishable pairs; the campaign-12 winner closes as validated opt-in,
+meter-visible ear-invisible. Logs in this folder.)*
+
 ## If you confirm it
 
 Finding 1 is already shipped. For Finding 3: v2 is opt-in and all objective guardrails passed,

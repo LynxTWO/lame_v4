@@ -1,0 +1,54 @@
+﻿foo_abx 2.2.3 report
+foobar2000 v2.25 preview 2025-08-26
+2026-07-09 14:54:15
+
+File A: P4_A_decoded.wav
+SHA1: 09bc7895def6a8ac5af442dec36ba252e15a1d71
+File B: P4_B_decoded.wav
+SHA1: b4efbcfc06d1dbd30592833788ac5486900cf049
+
+Output:
+Default : Speakers (AIR 192 6)
+Crossfading: NO
+
+14:54:15 : Test started.
+14:54:40 : Test restarted.
+14:54:40 : 01/01
+14:55:42 : Test restarted.
+14:55:42 : 01/02
+14:56:14 : Test restarted.
+14:56:14 : 02/03
+14:56:32 : Test restarted.
+14:56:32 : 03/04
+14:56:49 : Test restarted.
+14:56:49 : 03/05
+14:57:01 : Test restarted.
+14:57:01 : 03/06
+14:57:18 : Test restarted.
+14:57:18 : 03/07
+14:57:36 : Test restarted.
+14:57:36 : 03/08
+14:57:53 : Test restarted.
+14:57:53 : 04/09
+14:58:00 : Test restarted.
+14:58:00 : 05/10
+14:58:11 : Test restarted.
+14:58:11 : 06/11
+14:58:17 : Test restarted.
+14:58:17 : 06/12
+14:58:30 : Test restarted.
+14:58:30 : 06/13
+14:58:41 : Test restarted.
+14:58:41 : 06/14
+14:58:51 : Test restarted.
+14:58:51 : 07/15
+14:58:56 : Test restarted.
+14:58:56 : 07/16
+14:58:56 : Test finished.
+
+ ---------- 
+Total: 7/16
+p-value: 0.7728 (77.28%)
+
+ -- signature -- 
+31ddd01ffb336286e73377b819ba3024536234dd
