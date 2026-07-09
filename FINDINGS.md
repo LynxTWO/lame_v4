@@ -1017,6 +1017,33 @@ insurance itself was a modulation source. The remaining human bar is the audNMR 
 equal-size pairs; the priority pairs are h14, the largest measured gain at -1.06 dB, and
 h16, the largest audNMR rise at +0.263).
 
+Human ABX, first pair (2026-07-09): **h14 is audibly different - 14/16, p = 0.0021**
+(training-mode session, statistically valid per-trial blind choices, screenshot receipt,
+no signed log). The listener's percept: a phase artifact on a barely-tapped china cymbal
+near 5.6 s, "subtle but clearly recognizable". The protocol then ran in strict order -
+anchored verdict first, meter and key sealed until it landed - and the three answers
+line up:
+
+1. The listener's anchored verdict: the artifact is on side B.
+2. The windowed meter at 5.2-6.2 s: error LEVELS near-identical (within 1-2 dB,
+   trading windows) - the ear detected character, not loudness, same as campaign 11.
+3. The key: side B is **stock**.
+
+**The listener blind-identified an artifact in stock LAME that this mode removes** - the
+first time in this project a human caught stock misbehaving against a v4 change rather
+than the reverse. The percept matches the measured mechanism: the tri predicate's margin
+spends bits inconsistently frame to frame, the swirl meter scores stock less stable on
+h14 (and by -0.28 corpus-wide), and a phasey shimmer on a quiet cymbal is what that
+inconsistency sounds like. The 2001 insurance is not merely a bit tax; on this material
+it is an audible artifact.
+
+One confound remains before this is airtight: the qmax side carried 2.0 kbps more
+(121.70 vs 119.66, the at-or-below landings). Stock cannot land between them (a bitrate
+cliff), so the control flips direction: `P1ctl_stock_above` is stock at 122.83 kbps,
+a +1.13 kbps advantage over the qmax side. If the artifact persists in the control ABX
+(stock-above vs the same qmax A), bits are exonerated and the verdict stands
+conclusively; pending.
+
 ---
 
 ### Finding 0 (minor). Re-enabling the in-loop Huffman search.

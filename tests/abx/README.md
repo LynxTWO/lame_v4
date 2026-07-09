@@ -202,6 +202,17 @@ Disclosure: bitrate cliffs left the tuned side 0.1-2.3 kbps ABOVE stock on every
 (P3/h02 is the cleanest at 127.96 vs 127.87), so a stock win is stronger evidence than
 a tuned win. Same protocol: verdicts before the key.
 
+*(P1 outcome 2026-07-09: **14/16, p = 0.0021** (training-mode session, screenshot
+receipt) - a phase artifact on a barely-tapped china cymbal near 5.6 s. The anchored
+verdict placed the artifact on side B, the windowed meter showed equal error levels
+(character, not loudness), and the key revealed B = STOCK: **the listener
+blind-identified an artifact in stock LAME that the quality-max search removes** - the
+tri margin's frame-to-frame inconsistency, audible. Control pair for the 2.0 kbps
+confound: `P1ctl_stock_above_decoded.wav` is stock at 122.83 kbps, a +1.13 kbps
+ADVANTAGE over the qmax side (stock cannot land between the two rates - a cliff). ABX
+it against `P1_A_decoded.wav`: if the artifact persists despite stock's extra bits, the
+verdict is airtight.)*
+
 ## Stability-flag pairs S1 and S2 (2026-07-09 audit)
 
 The swirl meter's first pass over the legacy configs flagged one file per CBR config;
