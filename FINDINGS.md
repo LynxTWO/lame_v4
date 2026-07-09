@@ -1037,12 +1037,15 @@ h14 (and by -0.28 corpus-wide), and a phasey shimmer on a quiet cymbal is what t
 inconsistency sounds like. The 2001 insurance is not merely a bit tax; on this material
 it is an audible artifact.
 
-One confound remains before this is airtight: the qmax side carried 2.0 kbps more
-(121.70 vs 119.66, the at-or-below landings). Stock cannot land between them (a bitrate
-cliff), so the control flips direction: `P1ctl_stock_above` is stock at 122.83 kbps,
-a +1.13 kbps advantage over the qmax side. If the artifact persists in the control ABX
-(stock-above vs the same qmax A), bits are exonerated and the verdict stands
-conclusively; pending.
+One confound remained: the qmax side carried 2.0 kbps more (121.70 vs 119.66, the
+at-or-below landings). It resolved by accident before it resolved by design. A stale
+file from an aborted control generation (stock at 119.66) was left in the package, and
+the listener's first control session ABX'd it against stock at 122.83 - **stock vs
+stock, 3.2 kbps apart: 7/16, p = 0.77, null** (signed log archived). A rate delta
+LARGER than the P1 pair's 2.0 kbps gap is inaudible on this material, so bitrate is
+exonerated as the cause of the 14/16. The designed control (stock at 122.83, a +1.13
+kbps advantage, against the same qmax side) remains available as the belt-and-braces
+finish; the stale file is removed.
 
 ---
 

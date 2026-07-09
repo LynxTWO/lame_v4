@@ -213,6 +213,14 @@ ADVANTAGE over the qmax side (stock cannot land between the two rates - a cliff)
 it against `P1_A_decoded.wav`: if the artifact persists despite stock's extra bits, the
 verdict is airtight.)*
 
+*(Accidental rate control, 2026-07-09: a stale file from an aborted control generation
+(stock at 119.66) was mistakenly left in the package and the first control session
+ABX'd it against stock at 122.83 - stock vs stock, 3.2 kbps apart: **7/16, p = 0.77,
+null** (log archived). A rate delta LARGER than P1's 2.0 kbps gap is inaudible on this
+material, so bitrate is exonerated as the cause of the 14/16. The stale file is removed;
+the designed control above - `P1ctl_stock_above_decoded.wav` vs `P1_A_decoded.wav` -
+remains the belt-and-braces finish.)*
+
 ## Stability-flag pairs S1 and S2 (2026-07-09 audit)
 
 The swirl meter's first pass over the legacy configs flagged one file per CBR config;
