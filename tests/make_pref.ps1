@@ -20,7 +20,8 @@ param(
     [double]$Target = 128,
     [int]$Seed = 20260706,
     [string]$Lame = "$PSScriptRoot\..\output\lame.exe",
-    [string]$Out = "$PSScriptRoot\abx\pref"
+    [string]$Out = "$PSScriptRoot\abx\pref",
+    [string[]]$Files = @('h10', 'h13', 'h04', 'h14', 'h08')
 )
 $ErrorActionPreference = 'Continue'
 $Measure = "$PSScriptRoot\..\tools\podcast\bin\Release\net8.0\podcast.exe"
@@ -48,8 +49,9 @@ function VbrBelowTarget([string]$wav, [string]$extra, [string]$outMp3, [double]$
 }
 
 $rng = [Random]::new($Seed)
-$files = 'h10', 'h13', 'h04', 'h14', 'h08'
-$key = @("Pair -> which of A/B is the TUNED (campaign-11) encode. Landed rates included.", "")
+# tolerate both -Files a,b,c (array) and pwsh -File invocation (single comma-joined string)
+$files = @($Files | ForEach-Object { $_ -split ',' } | Where-Object { $_ })
+$key = @("Pair -> which of A/B is the TUNED encode (cfg: $Cfg). Landed rates included.", "")
 $i = 0
 foreach ($name in $files) {
     $i++

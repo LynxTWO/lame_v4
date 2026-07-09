@@ -192,6 +192,29 @@ scored 16/16 on the campaign-11 dose over this material. An anchored fidelity ro
 moot on indistinguishable pairs; the campaign-12 winner closes as validated opt-in,
 meter-visible ear-invisible. Logs in this folder.)*
 
+## Finding 7 package (`pref_f7/`)
+
+Stock `-V` vs `--quality-max -V` (the corrected scalefactor search) at equal measured
+size, five pairs: h14/h16/h02/h15/h04. Priorities: **P1 (h14)**, the largest measured
+gain (-1.06 dB mean), and **P2 (h16)**, the largest audNMR rise (+0.263) - the mode's
+one open flag, since its stability read is positive (mean -0.28, worst 0.000).
+Disclosure: bitrate cliffs left the tuned side 0.1-2.3 kbps ABOVE stock on every pair
+(P3/h02 is the cleanest at 127.96 vs 127.87), so a stock win is stronger evidence than
+a tuned win. Same protocol: verdicts before the key.
+
+## Stability-flag pairs S1 and S2 (2026-07-09 audit)
+
+The swirl meter's first pass over the legacy configs flagged one file per CBR config;
+both configs' ABX nulls were on other material, so these bound - not revoke - their
+validated status. Fixed settings, equal size by construction.
+
+- `S1_stock128_h05` vs `S1_c7_128_h05` (+ `original_h05.wav`): the campaign-7 CBR 128
+  config on its flagged file (dStab +0.295, twice the campaign-12 cap).
+- `S2_stock320_h06` vs `S2_c8_320_h06` (+ `original_h06.wav`): the campaign-8 CBR 320
+  config on its flagged file (dStab +0.527, and the one file where its audNMR worsens).
+  Calibration note: 320 kbps error floors are far under masking; a null here is the
+  expected outcome and would still be informative.
+
 ## If you confirm it
 
 Finding 1 is already shipped. For Finding 3: v2 is opt-in and all objective guardrails passed,

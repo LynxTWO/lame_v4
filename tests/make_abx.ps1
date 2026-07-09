@@ -168,6 +168,32 @@ if ((Test-Path $sq28) -and (Test-Path $Measure)) {
     Write-Host "Campaign 11 SQAM 28 pair SKIPPED (needs tests/corpus/SQAM/28.wav and the podcast tool)."
 }
 
+# ---- Stability-flag pairs (2026-07-09 audit): the swirl meter's first pass over the
+# legacy configs flagged one file each on the two CBR configs (their ABX nulls were on
+# different material). S1: h05 at CBR128, stock vs the campaign-7 config (dStab +0.295).
+# S2: h06 at CBR320, stock vs the campaign-8 config (dStab +0.527; also the one file
+# where that config's audNMR worsens). Fixed settings = equal size by construction. ----
+$c7 = @('-q','0','-b','128','--ns-bass','-2.50','--athlower','1.50')
+$h05s = "$PSScriptRoot\corpus_holdout\h05.wav"
+if (Test-Path $h05s) {
+    & $Lame --quiet -q 0 -b 128 $h05s (Join-Path $Out 'S1_stock128_h05.mp3') 2>&1 | Out-Null
+    & $Lame --quiet @c7 $h05s (Join-Path $Out 'S1_c7_128_h05.mp3') 2>&1 | Out-Null
+    foreach ($t in 'S1_stock128_h05', 'S1_c7_128_h05') {
+        & $Lame --quiet --decode (Join-Path $Out "$t.mp3") (Join-Path $Out "$($t)_decoded.wav") 2>&1 | Out-Null
+    }
+    Write-Host "Stability-flag pair S1 written (h05 at CBR128, stock vs campaign-7 config)."
+}
+$h06s = "$PSScriptRoot\corpus_holdout\h06.wav"
+if (Test-Path $h06s) {
+    Copy-Item $h06s (Join-Path $Out 'original_h06.wav') -Force
+    & $Lame --quiet -q 0 -b 320 $h06s (Join-Path $Out 'S2_stock320_h06.mp3') 2>&1 | Out-Null
+    & $Lame --quiet @W320 $h06s (Join-Path $Out 'S2_c8_320_h06.mp3') 2>&1 | Out-Null
+    foreach ($t in 'S2_stock320_h06', 'S2_c8_320_h06') {
+        & $Lame --quiet --decode (Join-Path $Out "$t.mp3") (Join-Path $Out "$($t)_decoded.wav") 2>&1 | Out-Null
+    }
+    Write-Host "Stability-flag pair S2 written (h06 at CBR320, stock vs campaign-8 config)."
+}
+
 # ---- Finding 3: 400 Lux full track, qmax v1 vs v2 (+ default -q0 reference) ----
 if ((Test-Path $QmaxV1) -and (Test-Path $Lame) -and (Test-Path $LuxSource)) {
     Copy-Item $LuxSource (Join-Path $Out 'original_400lux.wav') -Force

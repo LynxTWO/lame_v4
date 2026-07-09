@@ -887,6 +887,28 @@ apart, so the winner's status closes as **validated opt-in**: meter-visible,
 ear-invisible - the same profile as every legitimately validated config in this
 project, now with the stability gate standing behind it.
 
+#### Stability audit of the earlier winners (2026-07-09)
+
+The swirl meter's first pass over the three configs validated before it existed, each at
+its own setting on the h-set (fixed CBR/ABR settings, so equal size by construction):
+
+| Config | Dose | Mean dStab | Files over the 0.15 cap |
+| --- | --- | --- | --- |
+| campaign 9, ABR 192 | `--ns-bass -5.00` | -0.000 | **0 of 16 - clean** |
+| campaign 7, CBR 128 | `--ns-bass -2.50` | +0.053 | 1 of 16: h05 +0.295 |
+| campaign 8, CBR 320 | `--ns-bass -8.00` | +0.080 | 1 of 16: h06 +0.527 |
+
+Two lessons. First, the stability cost of deep bass doses is a rate-and-path property,
+not a property of the knob: the -5.00 dose at ABR 192 is perfectly stable while -1.50
+was the audited limit at 128 kbps VBR. Second, both CBR configs carry one flagged file
+each, and both configs' ABX nulls were run on different material (Tom's Diner; h05 and
+400 Lux at 320 - h05's flag is at CBR 128, not 320). The flags do not revoke their
+validated status - the campaign-12 calibration was measured at 128 kbps VBR and its
+transfer to other rates is untested - but they are open listening items:
+`tests/make_abx.ps1` now writes S1 (h05 at CBR 128, stock vs campaign-7 config, dStab
++0.295) and S2 (h06 at CBR 320, stock vs campaign-8 config, dStab +0.527, also the one
+file where that config's audNMR worsens, +0.137).
+
 One physics revision, scoped to what was measured: the bass direction is now confirmed a
 fifth independent time, but campaign 12 shows the meter-optimal dose overshoots what
 fidelity allows at 128 kbps VBR - the -4.7 dose bought its meter points partly with
@@ -983,11 +1005,17 @@ Merged behind `--quality-max` (VBR path only; CBR/ABR quality-max is untouched, 
 without the flag every encode is byte-identical to stock - gate 70 of 70 both ways).
 `LAME_VBRQ_FIND` stays as the measurement harness for the other three variants. Not a
 default change: the audNMR drift and the SQAM 37-file scatter are meter-scale, but the
-project ships defaults only on audible receipts. Note the epistemic status after the
-campaign-11 demotion: Finding 7's evidence is meter-only. Its mechanism does not touch
-block switching (the axis the anchored fidelity round caught), but no anchored human
-test has been run on it either - that test is the bar before this mode is ever
-recommended beyond experimentation.
+project ships defaults only on audible receipts.
+
+Stability read (2026-07-09, after the swirl meter existed): this mode **improves** HF
+temporal stability - h-set mean hfStab -0.279 with a worst per-file delta of exactly
+0.000, and several files dramatically steadier (h11 -0.75, h03 -0.70, h07 -0.62). In
+hindsight the mechanism explains it: the tri predicate's one-step-finer margin was not
+just spending bits, it was spending them inconsistently from frame to frame - the
+insurance itself was a modulation source. The remaining human bar is the audNMR drift
+(+0.18 mean on music): the listening package is generated (`tests/abx/pref_f7/`, five
+equal-size pairs; the priority pairs are h14, the largest measured gain at -1.06 dB, and
+h16, the largest audNMR rise at +0.263).
 
 ---
 
@@ -1183,8 +1211,8 @@ look excellent right up until the material is unseen.
 | Item | Why it matters |
 | --- | --- |
 | Quality-max VBR at other rates | Finding 7 and campaign 11 were both validated at 128 kbps measured; `-V 2`-class rates (~190 kbps) should be spot-checked with the same equal-size harness before either is recommended there |
-| Anchored fidelity round: Finding 7 | the campaign-12 winner's round is resolved (ABX null on the flagged pairs, 2026-07-09); Finding 7 remains meter-only and needs its own package before any recommendation |
-| Stability spot-check of the campaign-7 CBR 128 config | its `--ns-bass -2.50` dose exceeds the fidelity-audited -1.50 found at 128 VBR; one validate run with the stability column settles whether the CBR context behaves differently |
+| Listening: Finding 7 package (`pref_f7/`) | its stability read is POSITIVE (mean -0.28, worst 0.000) so the audNMR drift (+0.18) is the remaining human question; priority pairs h14 (largest gain, -1.06) and h16 (largest audNMR rise, +0.263) |
+| Listening: stability-flag pairs S1 and S2 | the legacy audit flagged one file per CBR config (h05 at CBR 128 +0.295, h06 at CBR 320 +0.527); both configs' ABX nulls were on other material. Optional - the flags do not revoke validated status, they bound it |
 | Optional: focused short-clip ABX re-tests | looped short excerpts are sharper instruments than full dense tracks if a difference verdict is ever needed on small deltas |
 | Longer fuzz campaign | extend decoder safety coverage now that the harness is proven |
 
