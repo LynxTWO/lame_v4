@@ -18,6 +18,11 @@ cmake_minimum_required(VERSION 3.15)
 project(lame C)
 
 option(LAME_FUZZ "Build the libFuzzer harnesses (requires clang)" OFF)
+# Assertions are OFF by default (NDEBUG), matching the shipped nmake build (ASSERTS default)
+# and stock LAME: assert() is a dev tool, and a shipped encoder must not abort its host on
+# merely-unusual input. Turn ON for development invariant checking (the fuzz harnesses keep
+# ASan for memory safety either way). See FINDINGS "Encoder-API fuzzing".
+option(LAME_ASSERTS "Keep assert() live (do not define NDEBUG)" OFF)
 
 # Single-config generators default to no build type, which drags in Debug-ish flags that
 # clash with the canonical /O2 set below. Everything here assumes Release semantics.
@@ -87,6 +92,12 @@ set(LAME_DEFS
 )
 if(MSVC)
     list(APPEND LAME_DEFS Win64)
+endif()
+# NDEBUG by default (see the LAME_ASSERTS option). Kept in the shared LAME_DEFS so the
+# library, the frontend, and the fuzz harnesses all agree, and so the nmake and CMake
+# builds stay bit-comparable (both define it unless assertions are explicitly requested).
+if(NOT LAME_ASSERTS)
+    list(APPEND LAME_DEFS NDEBUG)
 endif()
 
 if(MSVC)

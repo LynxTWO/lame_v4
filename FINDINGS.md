@@ -1200,8 +1200,9 @@ CI (`.github/workflows/ci.yml`, live at LynxTWO/lame_v4):
 | Job | What it enforces |
 | --- | --- |
 | windows-bitexact | nmake == CMake parity and `--threads 2` == sequential parity against a runner-built baseline; the committed dev baseline runs as an informational toolchain-drift detector |
-| linux-smoke | gcc build; every reference setting encodes and decodes cleanly; meter self-check and a catastrophic-breakage ceiling; docs lint |
-| fuzz-decoder | mpglib/hip decoder under libFuzzer and ASan, 60 s per push, seeded by the freshly built encoder |
+| linux-smoke | gcc build **with assertions live** (`-DLAME_ASSERTS=ON`, the dev invariant safety net); every reference setting encodes and decodes cleanly; meter self-check and a catastrophic-breakage ceiling; docs lint |
+| fuzz-decoder | mpglib/hip decoder under libFuzzer and ASan, 60 s per push, seeded by the freshly built encoder (shipped `NDEBUG` config: gates on memory-unsafety) |
+| fuzz-encoder | public encoder API (`lame_set_*` + PCM) under libFuzzer and ASan, 60 s per push (shipped `NDEBUG` config) |
 
 The first live runs earned their keep: they caught a real 25-year-old portability bug
 (config.h defined the stdint type names as macros, fatal against modern glibc) and proved
@@ -1216,15 +1217,15 @@ The evolved 1,252-item corpus stays local (its seeds derive from copyrighted exc
 and corpus audio never enters the repo); the harness and recipe are committed, so the
 campaign reproduces from scratch.
 
-### Encoder-API fuzzing: a real validation gap fixed, one pre-existing assert deferred
+### Encoder-API fuzzing, and the NDEBUG policy it forced
 
 `fuzz/fuzz_encode.c` is the companion target: it feeds raw fuzz values straight into the
 public `lame_set_*` setters (no sanitization, because the API takes plain ints from real
 callers) and then arbitrary PCM through `lame_encode_buffer_interleaved` plus a flush. A
 3-hour 8-worker campaign (2026-07-10) lit 5,671 edges and found crashes - **all
-assertion aborts, none memory-unsafe** (no heap overflow, no use-after-free). This
-matters because the v4 build deliberately keeps `NDEBUG` undefined, so a live `assert()`
-is a real process abort, not a compiled-out no-op.
+assertion aborts, none memory-unsafe** (no heap overflow, no use-after-free). That
+distinction is the whole story: v4 was building with `NDEBUG` undefined, so a live
+`assert()` was a real process abort in the shipped library, not a compiled-out no-op.
 
 The dominant class, ~95% of the crashes, was a genuine input-validation gap: **free
 format writes the requested bitrate into the frame header verbatim**, and stock only
@@ -1236,16 +1237,40 @@ out-of-range brate now returns the documented -1 from `lame_init_params`. Regres
 green, valid free format unaffected (byte-identical encode), and a re-run of the crash
 corpus against the fixed build cleared the entire class.
 
-The residual class, ~5%, is a pre-existing quantizer invariant:
-`assert(cod_info->part2_3_length <= targ_bits[ch])` in `CBR_iteration_loop`, reached by
-free format plus pathological PCM (q0, not quality-max, so untouched by any v4 change).
-In a conventional `NDEBUG` release this is compiled out and the bitstream path tolerates
-the overspend; it aborts here only because v4 keeps asserts live as a dev safety net. It
-is not memory-unsafe. Fixing it properly means analysing free-format bit-target
-accounting without changing valid output, so it is deferred and tracked rather than
-patched reactively off fuzz cases. `fuzz_encode` builds in CI (compile check) but its
-timed run stays disabled until this assert is resolved or the release build defines
-`NDEBUG`.
+The residual class, ~5%, was `assert(cod_info->part2_3_length <= targ_bits[ch])` in
+`CBR_iteration_loop`. Testing (not theory) placed it: clearing the free-format bit on a
+repro leaves it firing identically, so it is not free-format-specific, and it is q0 not
+quality-max, so not a v4 regression. It is the soft budget advisory - the hard format
+invariant on the neighbouring line, `part2_3_length <= MAX_BITS_PER_CHANNEL`, never fired
+- so the bitstream is valid; the granule merely overspends its target on pathological PCM
+at the coarsest quantization, which is exactly what the bit reservoir absorbs. Stock LAME
+has shipped it compiled out for 25 years.
+
+That residual forced a decision v4 had left implicit: **should the shipped encoder keep
+assertions live?** For a library embedded in other software (CUETools), aborting the
+host process on merely-unusual input is a robustness regression against stock LAME, which
+ships with `NDEBUG`. The proof it is safe to compile them out was direct: **all 2,937
+crash inputs, replayed against an `NDEBUG` build with AddressSanitizer still active,
+produced zero memory-unsafety.** The asserts were the only thing aborting; the code past
+each one handles the input and emits valid output.
+
+So the policy is now the standard split:
+
+- **Shipped and bit-exact builds define `NDEBUG`** (nmake default, CMake Release). No
+  host aborts on non-memory-unsafe input, matching stock LAME. Assertions are
+  side-effect-free, so the 70-case gate stays byte-identical and the binary is ~42 KB
+  smaller.
+- **Development keeps assertions live** (`ASSERTS=1` for nmake, `-DLAME_ASSERTS=ON` for
+  CMake). CI's `linux-smoke` job builds this way and encodes the synthetic torture corpus
+  with assertions on, so a change that violates a quantizer or bitstream invariant still
+  reds the build.
+- **The fuzz harnesses run the shipped `NDEBUG` config under ASan** - fuzzing what ships,
+  gating on real memory-unsafety, not dev asserts. `fuzz_encode` is now a real 60 s CI
+  gate (37k inputs in 120 s locally, clean), no longer compile-check-only.
+
+This resolves the residual assert - and every other latent over-strict assert - at the
+policy level, without patching a 25-year-old quantizer invariant reactively off fuzz
+cases, which would have risked changing valid output for no measured benefit.
 
 `tests/lint-docs.sh` fails CI when tracked Markdown contains typographic Unicode (em
 dashes, arrows, checkmarks). Writing rules live in `docs/writing-guide.md`.

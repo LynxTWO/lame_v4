@@ -231,9 +231,18 @@ CC_OPTS = $(CC_OPTS) /W$(WARN)
 CC_OPTS = $(CC_OPTS) /DFLOAT8=float /DREAL_IS_FLOAT=1
 !	ENDIF
 
-# temporary remove NDEBUG, see configure.in
-#CC_OPTS = $(CC_OPTS) /DNDEBUG /MT
+# NDEBUG (assert compiled out) is the DEFAULT for the shipped build. assert() is a
+# development tool, not runtime error handling; a shipped encoder library must never
+# abort its host process on merely-unusual input. The v4 encoder-API fuzz (2026-07-10)
+# proved this concretely: 2937 inputs abort an assert-enabled build, and every one is
+# memory-SAFE under ASan with NDEBUG (the code past each assert handles it and produces
+# valid output). Stock LAME ships this way. Build with ASSERTS=1 to keep asserts live
+# for development (the fuzz harnesses run ASan either way; CI dev checks use ASSERTS=1).
+!	IF "$(ASSERTS)" == "1"
 CC_OPTS = $(CC_OPTS) /MT
+!	ELSE
+CC_OPTS = $(CC_OPTS) /DNDEBUG /MT
+!	ENDIF
 
 LN_OPTS = /nologo /pdb:none
 LN_DLL = /nologo /DLL
