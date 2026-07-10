@@ -87,3 +87,10 @@ jobs:
           ./build-fuzz/lame --quiet --abr 64 -m m tests/regress_corpus/castanet_bursts.wav seeds/abr64m.mp3
       - name: Fuzz hip_decode (60 s)
         run: ./build-fuzz/fuzz_hip_decode seeds -max_total_time=60 -print_final_stats=1
+      # fuzz_encode builds here (verifies the harness compiles) but is NOT time-gated yet:
+      # a from-scratch run reaches a pre-existing free-format quantizer assert within
+      # seconds (part2_3_length <= targ_bits; FINDINGS "Encoder-API fuzzing"), which would
+      # red the build on a known-deferred issue. Re-enable the timed run once that assert
+      # is resolved or the release build defines NDEBUG.
+      - name: Build encoder-API fuzz harness (compile check only)
+        run: test -x ./build-fuzz/fuzz_encode

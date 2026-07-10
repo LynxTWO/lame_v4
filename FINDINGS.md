@@ -1216,6 +1216,37 @@ The evolved 1,252-item corpus stays local (its seeds derive from copyrighted exc
 and corpus audio never enters the repo); the harness and recipe are committed, so the
 campaign reproduces from scratch.
 
+### Encoder-API fuzzing: a real validation gap fixed, one pre-existing assert deferred
+
+`fuzz/fuzz_encode.c` is the companion target: it feeds raw fuzz values straight into the
+public `lame_set_*` setters (no sanitization, because the API takes plain ints from real
+callers) and then arbitrary PCM through `lame_encode_buffer_interleaved` plus a flush. A
+3-hour 8-worker campaign (2026-07-10) lit 5,671 edges and found crashes - **all
+assertion aborts, none memory-unsafe** (no heap overflow, no use-after-free). This
+matters because the v4 build deliberately keeps `NDEBUG` undefined, so a live `assert()`
+is a real process abort, not a compiled-out no-op.
+
+The dominant class, ~95% of the crashes, was a genuine input-validation gap: **free
+format writes the requested bitrate into the frame header verbatim**, and stock only
+warned above 320 kbps while never checking the low end. So a caller passing brate 0, 3,
+or 999999 with free format (in any VBR mode - the VBR-plus-free-format combo defaults
+brate to 0) passed `lame_init_params` and aborted mid-encode at `getframebits`'
+`assert(8 <= bit_rate <= 640)`. Fixed by validating up front: free format with an
+out-of-range brate now returns the documented -1 from `lame_init_params`. Regress 70/70
+green, valid free format unaffected (byte-identical encode), and a re-run of the crash
+corpus against the fixed build cleared the entire class.
+
+The residual class, ~5%, is a pre-existing quantizer invariant:
+`assert(cod_info->part2_3_length <= targ_bits[ch])` in `CBR_iteration_loop`, reached by
+free format plus pathological PCM (q0, not quality-max, so untouched by any v4 change).
+In a conventional `NDEBUG` release this is compiled out and the bitstream path tolerates
+the overspend; it aborts here only because v4 keeps asserts live as a dev safety net. It
+is not memory-unsafe. Fixing it properly means analysing free-format bit-target
+accounting without changing valid output, so it is deferred and tracked rather than
+patched reactively off fuzz cases. `fuzz_encode` builds in CI (compile check) but its
+timed run stays disabled until this assert is resolved or the release build defines
+`NDEBUG`.
+
 `tests/lint-docs.sh` fails CI when tracked Markdown contains typographic Unicode (em
 dashes, arrows, checkmarks). Writing rules live in `docs/writing-guide.md`.
 

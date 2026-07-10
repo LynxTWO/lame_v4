@@ -632,6 +632,16 @@ lame_init_params(lame_global_flags * gfp)
         if (SmpFrqIndex(gfp->samplerate_out, &v) < 0)
             return -1; /* output sample rate makes no sense */
     }
+    /* v4: free format writes the requested bitrate into the frame header verbatim (no
+       table snapping), so an out-of-range brate is not self-correcting the way CBR's
+       FindNearestBitrate is. Stock only WARNED above 320 and never checked the low end,
+       so a caller passing brate 0/3/999999 with free format sailed through init and
+       aborted mid-encode at getframebits' assert(8 <= bit_rate <= 640) - and the shipped
+       build keeps asserts live (no NDEBUG). This reaches free format in ANY vbr mode
+       (the VBR+free-format combo defaults brate to 0). Reject out of range up front: the
+       documented bad-parameters path. Found by the encoder-API fuzz target, 2026-07-10. */
+    if (gfp->free_format && (gfp->brate < 8 || gfp->brate > 640))
+        return -1;
 
     cfg = &gfc->cfg;
 

@@ -122,18 +122,21 @@ if(NOT MSVC)
     target_link_libraries(lame PRIVATE m)
 endif()
 
-# libFuzzer harnesses (clang only): fuzz the mpglib/hip decoder with attacker-controlled
-# MP3 bytes. Built as a separate opt-in target so normal builds never depend on clang.
+# libFuzzer harnesses (clang only): fuzz_hip_decode feeds attacker-controlled MP3 bytes to
+# the mpglib/hip decoder; fuzz_encode feeds attacker-controlled parameters and PCM to the
+# public encoder API. Opt-in target so normal builds never depend on clang.
 if(LAME_FUZZ)
     if(NOT CMAKE_C_COMPILER_ID MATCHES "Clang")
         message(FATAL_ERROR "LAME_FUZZ requires clang (libFuzzer)")
     endif()
-    add_executable(fuzz_hip_decode fuzz/fuzz_hip_decode.c)
-    target_include_directories(fuzz_hip_decode PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/libmp3lame)
-    target_compile_definitions(fuzz_hip_decode PRIVATE ${LAME_DEFS})
-    target_compile_options(fuzz_hip_decode PRIVATE -O1 -g -fsanitize=fuzzer,address)
-    target_link_options(fuzz_hip_decode PRIVATE -fsanitize=fuzzer,address)
-    target_link_libraries(fuzz_hip_decode PRIVATE mp3lame m)
+    foreach(harness fuzz_hip_decode fuzz_encode)
+        add_executable(${harness} fuzz/${harness}.c)
+        target_include_directories(${harness} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/libmp3lame)
+        target_compile_definitions(${harness} PRIVATE ${LAME_DEFS})
+        target_compile_options(${harness} PRIVATE -O1 -g -fsanitize=fuzzer,address)
+        target_link_options(${harness} PRIVATE -fsanitize=fuzzer,address)
+        target_link_libraries(${harness} PRIVATE mp3lame m)
+    endforeach()
 endif()
