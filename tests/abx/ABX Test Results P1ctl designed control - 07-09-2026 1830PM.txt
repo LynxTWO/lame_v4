@@ -1,0 +1,60 @@
+Designed control for the Finding 7 P1 verdict: A = stock at 122.83 kbps (a +1.13 kbps
+ADVANTAGE), B = the same quality-max side as P1 (121.70 kbps). Listener's note: the tell
+was 00:00:02.890-00:00:03.027 in P1ctl_stock_above_decoded.wav, where the china cymbal
+tap "swirls for a second and sounds odd"; "P1_A_decoded.wav does not have that problem
+and retains more." Log pasted by the listener, archived here.
+
+foo_abx 2.2.3 report
+foobar2000 v2.25 preview 2025-08-26
+2026-07-09 18:26:51
+
+File A: P1ctl_stock_above_decoded.wav
+SHA1: 0588c3eb1d470c880929b328c2605504a9be2491
+File B: P1_A_decoded.wav
+SHA1: 70ecb9c9fc0fe43fd2dcfc719d056ae4741045b6
+
+Output:
+Default : Speakers (AIR 192 6)
+Crossfading: NO
+
+18:26:51 : Test started.
+18:27:02 : Test restarted.
+18:27:02 : 01/01
+18:27:29 : Test restarted.
+18:27:29 : 02/02
+18:27:53 : Test restarted.
+18:27:53 : 03/03
+18:28:10 : Test restarted.
+18:28:10 : 04/04
+18:28:19 : Test restarted.
+18:28:19 : 05/05
+18:28:32 : Test restarted.
+18:28:32 : 06/06
+18:28:42 : Test restarted.
+18:28:42 : 07/07
+18:28:49 : Test restarted.
+18:28:49 : 08/08
+18:29:00 : Test restarted.
+18:29:00 : 09/09
+18:29:09 : Test restarted.
+18:29:09 : 10/10
+18:29:22 : Test restarted.
+18:29:22 : 11/11
+18:29:56 : Test restarted.
+18:29:56 : 12/12
+18:30:05 : Test restarted.
+18:30:05 : 13/13
+18:30:21 : Test restarted.
+18:30:21 : 14/14
+18:30:35 : Test restarted.
+18:30:35 : 15/15
+18:30:54 : Test restarted.
+18:30:54 : 16/16
+18:30:54 : Test finished.
+
+ ----------
+Total: 16/16
+p-value: 0 (0%)
+
+ -- signature --
+cb2bbd1b0ec362755b14fca2b6e2bc242337b885

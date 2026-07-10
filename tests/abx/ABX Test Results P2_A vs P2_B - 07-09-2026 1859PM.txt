@@ -1,0 +1,59 @@
+Finding 7 pref_f7 P2: h16, the mode's worst audNMR flag (+0.263), stock 124.56 vs
+qmax 125.72 kbps. Result: null. The listener's sighted impression of a small mid-bass
+difference at 0:05.023-0:06.000 did not survive blinding (5/16). Log pasted by the
+listener, archived here.
+
+foo_abx 2.2.3 report
+foobar2000 v2.25 preview 2025-08-26
+2026-07-09 18:55:32
+
+File A: P2_A_decoded.wav
+SHA1: f2ac700c16a67c4e7f93fedd02b9107b0683948d
+File B: P2_B_decoded.wav
+SHA1: 67a62933e2a0161d130cbc071963bfc587161413
+
+Output:
+Default : Speakers (AIR 192 6)
+Crossfading: NO
+
+18:55:32 : Test started.
+18:56:05 : Test restarted.
+18:56:05 : 00/01
+18:56:14 : Test restarted.
+18:56:14 : 00/02
+18:56:23 : Test restarted.
+18:56:23 : 01/03
+18:56:45 : Test restarted.
+18:56:45 : 02/04
+18:56:59 : Test restarted.
+18:56:59 : 02/05
+18:57:17 : Test restarted.
+18:57:17 : 02/06
+18:57:38 : Test restarted.
+18:57:38 : 02/07
+18:57:57 : Test restarted.
+18:57:57 : 02/08
+18:58:07 : Test restarted.
+18:58:07 : 02/09
+18:58:26 : Test restarted.
+18:58:26 : 03/10
+18:58:41 : Test restarted.
+18:58:41 : 04/11
+18:58:52 : Test restarted.
+18:58:52 : 04/12
+18:59:15 : Test restarted.
+18:59:15 : 04/13
+18:59:29 : Test restarted.
+18:59:29 : 05/14
+18:59:38 : Test restarted.
+18:59:38 : 05/15
+18:59:53 : Test restarted.
+18:59:53 : 05/16
+18:59:53 : Test finished.
+
+ ----------
+Total: 5/16
+p-value: 0.9616 (96.16%)
+
+ -- signature --
+a4b995836f21153133c689f63e3a8ba7dd1d3651

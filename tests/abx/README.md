@@ -217,9 +217,17 @@ verdict is airtight.)*
 (stock at 119.66) was mistakenly left in the package and the first control session
 ABX'd it against stock at 122.83 - stock vs stock, 3.2 kbps apart: **7/16, p = 0.77,
 null** (log archived). A rate delta LARGER than P1's 2.0 kbps gap is inaudible on this
-material, so bitrate is exonerated as the cause of the 14/16. The stale file is removed;
-the designed control above - `P1ctl_stock_above_decoded.wav` vs `P1_A_decoded.wav` -
-remains the belt-and-braces finish.)*
+material, so bitrate is exonerated as the cause of the 14/16. The stale file is removed.)*
+
+*(Designed control, 2026-07-09: stock at 122.83 kbps - a +1.13 kbps ADVANTAGE - vs the
+same qmax side: **16/16, p < 0.0001**, sixteen straight in four minutes (log archived).
+The listener's tells, both the same artifact class: 0:02.890-0:03.027 the china cymbal
+tap in the stock file "swirls for a second and sounds odd" while the qmax file "does not
+have that problem and retains more"; and 0:05.206-0:05.455, the corrected location of
+the original P1 percept, a swirl in the background china cymbal. **Verdict airtight: the
+quality-max search is audibly more faithful than stock on h14, with stock holding a
+bitrate advantage.** Remaining before the default question: P2/h16, the +0.263 audNMR
+flag pair.)*
 
 ## Stability-flag pairs S1 and S2 (2026-07-09 audit)
 

@@ -938,7 +938,7 @@ caught. Receipts: `tests/autotune_q0_cbr128.csv` through `autotune12_vbr128_stab
 
 ---
 
-### Finding 7. The VBR scalefactor search pays a measured bit tax for 2001-era insurance. `--quality-max` now removes the part that buys nothing.
+### Finding 7. The VBR scalefactor search paid an audible price for 2001-era insurance. The corrected search is now the v4 default for `-V`.
 
 Every `-V` encode since 2001 spends roughly 8% of its bits on a safety margin the
 distortion targets never asked for. Removing just that margin, and letting the equal-size
@@ -1001,11 +1001,18 @@ use, where it needs no opt-in tuning flags.
 
 #### Status
 
-Merged behind `--quality-max` (VBR path only; CBR/ABR quality-max is untouched, and
-without the flag every encode is byte-identical to stock - gate 70 of 70 both ways).
-`LAME_VBRQ_FIND` stays as the measurement harness for the other three variants. Not a
-default change: the audNMR drift and the SQAM 37-file scatter are meter-scale, but the
-project ships defaults only on audible receipts.
+**Default for the v4 `-V` path (owner decision 2026-07-09).** Originally merged behind
+`--quality-max` only; after the human program below produced the project's first
+audible-fidelity receipt, the bi-predicate search replaced the tri search for every
+measured `-V` encode (`full_outer_loop >= 0`; the fast path keeps `guess`). The regress
+baseline was deliberately re-locked: the damage pattern was verified as exactly the 30 V
+cases (10 corpus files x V0/V2/V5) with every CBR/ABR case untouched, and the new
+default's `-V4` output is byte-identical to the validated bin-bi path (t01: 511,915
+bytes). A cross-build check at matched measured rates confirmed the receipts transfer
+(h10: -0.69 dB mean, -0.26 stability vs the frozen pre-flip build). `LAME_VBRQ_FIND`
+stays as the measurement harness; value 5 selects the pre-v4 stock search for A/B. The
+project's rule held: this shipped default-on only after the audible receipt, exactly as
+Finding 1 did.
 
 Stability read (2026-07-09, after the swirl meter existed): this mode **improves** HF
 temporal stability - h-set mean hfStab -0.279 with a worst per-file delta of exactly
@@ -1020,9 +1027,9 @@ h16, the largest audNMR rise at +0.263).
 Human ABX, first pair (2026-07-09): **h14 is audibly different - 14/16, p = 0.0021**
 (training-mode session, statistically valid per-trial blind choices, screenshot receipt,
 no signed log). The listener's percept: a phase artifact on a barely-tapped china cymbal
-near 5.6 s, "subtle but clearly recognizable". The protocol then ran in strict order -
-anchored verdict first, meter and key sealed until it landed - and the three answers
-line up:
+at 5.206-5.455 s (timestamp corrected by the listener from an initial "around 5.6"),
+"subtle but clearly recognizable". The protocol then ran in strict order - anchored
+verdict first, meter and key sealed until it landed - and the three answers line up:
 
 1. The listener's anchored verdict: the artifact is on side B.
 2. The windowed meter at 5.2-6.2 s: error LEVELS near-identical (within 1-2 dB,
@@ -1037,15 +1044,38 @@ h14 (and by -0.28 corpus-wide), and a phasey shimmer on a quiet cymbal is what t
 inconsistency sounds like. The 2001 insurance is not merely a bit tax; on this material
 it is an audible artifact.
 
-One confound remained: the qmax side carried 2.0 kbps more (121.70 vs 119.66, the
-at-or-below landings). It resolved by accident before it resolved by design. A stale
-file from an aborted control generation (stock at 119.66) was left in the package, and
-the listener's first control session ABX'd it against stock at 122.83 - **stock vs
-stock, 3.2 kbps apart: 7/16, p = 0.77, null** (signed log archived). A rate delta
-LARGER than the P1 pair's 2.0 kbps gap is inaudible on this material, so bitrate is
-exonerated as the cause of the 14/16. The designed control (stock at 122.83, a +1.13
-kbps advantage, against the same qmax side) remains available as the belt-and-braces
-finish; the stale file is removed.
+The bitrate confound (the qmax side carried 2.0 kbps more at the at-or-below landings)
+was then closed twice:
+
+1. By accident: a stale file from an aborted control generation (stock at 119.66) was
+   left in the package, and the first control session ABX'd it against stock at 122.83 -
+   **stock vs stock, 3.2 kbps apart: 7/16, p = 0.77, null** (signed log archived). Rate
+   deltas larger than the P1 gap are inaudible on this material.
+2. By design: stock at 122.83 kbps - a **+1.13 kbps advantage** - against the same qmax
+   side: **16/16, p < 0.0001**, sixteen straight in four minutes (signed log archived).
+   The listener's note names a second instance of the same artifact class: at
+   0:02.890-0:03.027 the china cymbal tap in the stock file "swirls for a second and
+   sounds odd"; the qmax file "does not have that problem and retains more".
+
+**Verdict, airtight: this mode is audibly more faithful than stock on h14, with stock
+holding a bitrate advantage.** No change in this project has carried a stronger human
+receipt.
+
+The honest worst case followed the same day. P2/h16, the pair carrying the mode's
+largest audNMR rise (+0.263): **5/16, p = 0.96, null.** The listener's sighted
+impression of a small mid-bass difference at 0:05.023-0:06.000 did not survive blinding
+- the third time this project has watched a sighted percept collapse under the
+comparator, and the reason the comparator is the standard. The mode's one meter flag is
+formally ear-invisible.
+
+Finding 7's complete evidence chain, the strongest of any change in the project: -0.43
+dB on the library holdout at equal measured size with SQAM flat; HF stability improved
+(mean -0.28, worst file 0.000); the audNMR flag ABX'd null on its worst file; and
+audibly MORE faithful than stock on h14 with bitrate exonerated twice (a stock-vs-stock
+rate control at 3.2 kbps apart was null, and the difference survived stock holding a
++1.13 kbps advantage at 16/16). Whether the corrected search becomes the v4 default for
+the `-V` path - which would change every VBR encode and require a deliberate regress
+re-baseline, as Finding 1's default fix did - is an owner decision, now pending.
 
 ---
 
@@ -1228,7 +1258,7 @@ look excellent right up until the material is unseen.
 | Finding 6 campaigns 8-10 (per-rate) | three validated opt-in configs; CBR 320 at -1.81/-2.81 dB is the project's largest gain |
 | Finding 6 campaign 11 (VBR at equal measured size) | winner DEMOTED: -2.47 dB library at equal 128 kbps and ABX 16/16 (first audible tuning change of the project), but anchored blind fidelity went 5/5 to stock - the first time the listening program overturned the meter; two VBR measurement traps caught and recorded |
 | Finding 6 campaign 12 (stability-gated rerun) | the listener's fidelity verdicts became a meter (nmr field 5, hfStabDb; acceptance 5/5 on the labeled pairs) and a veto head (canary: the demoted config now rejects at 16x the cap); winner `--ns-bass -1.50` improves 82 of 83 holdout files at equal 128 kbps (-0.31/-0.25); ABX null on the flagged pairs (7/16 on h14, 10/16 on h13) - validated opt-in |
-| Finding 7: quality-max VBR scalefactor search | merged; the tri predicate's one-step-finer margin (~8% of bits) removed, its lattice-fluke check kept; -0.43 dB library holdout at equal 128 kbps, SQAM flat, transients clean; not additive with the campaign-11 flags |
+| Finding 7: VBR scalefactor search corrected | **v4 default for `-V`** (owner decision 2026-07-09): the tri predicate's one-step-finer margin (~8% of bits) removed, its lattice-fluke check kept; -0.43 dB library holdout at equal 128 kbps, stability improved; the listener blind-identified the stock margin's artifact (14/16, 16/16 with stock holding a bitrate advantage) and its own worst flag ABX'd null (5/16); regress deliberately re-baselined (V cases only) |
 | Podcast optimizer v2 | landed; true VBR wins at equal measured bitrate |
 | Fractional ABR | landed, regress-gated |
 | Equal-measured-size harness | landed; first result: quality-max was a no-op for modern VBR (resolved by Finding 7) |
@@ -1241,7 +1271,7 @@ look excellent right up until the material is unseen.
 | Item | Why it matters |
 | --- | --- |
 | Quality-max VBR at other rates | Finding 7 and campaign 11 were both validated at 128 kbps measured; `-V 2`-class rates (~190 kbps) should be spot-checked with the same equal-size harness before either is recommended there |
-| Listening: Finding 7 package (`pref_f7/`) | its stability read is POSITIVE (mean -0.28, worst 0.000) so the audNMR drift (+0.18) is the remaining human question; priority pairs h14 (largest gain, -1.06) and h16 (largest audNMR rise, +0.263) |
+| Re-validate the campaign-12 config against the new default | `--ns-bass -1.50`'s receipts were measured against the old tri-search baseline; with the corrected search now the `-V` default, one validate run confirms (or retires) the config on the new baseline |
 | Listening: stability-flag pairs S1 and S2 | the legacy audit flagged one file per CBR config (h05 at CBR 128 +0.295, h06 at CBR 320 +0.527); both configs' ABX nulls were on other material. Optional - the flags do not revoke validated status, they bound it |
 | Optional: focused short-clip ABX re-tests | looped short excerpts are sharper instruments than full dense tracks if a difference verdict is ever needed on small deltas |
 | Longer fuzz campaign | extend decoder safety coverage now that the harness is proven |

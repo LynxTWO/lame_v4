@@ -543,7 +543,8 @@ qmax_find_sf(void)
     case 1:  return find_scalefac_x34_bin_plain;
     case 2:  return find_scalefac_x34_exh_plain;
     case 3:  return find_scalefac_x34_exh_tri;
-    default: return find_scalefac_x34_bin_bi; /* 0/4: margin dropped, fluke check kept */
+    case 5:  return find_scalefac_x34;         /* pre-v4 stock (tri + binary), for A/B */
+    default: return find_scalefac_x34_bin_bi;  /* 0/4: margin dropped, fluke check kept */
     }
 }
 
@@ -1449,10 +1450,18 @@ VBR_encode_frame(lame_internal_flags * gfc, const FLOAT xr34orig[2][2][576],
             use_nbits_ch[gr][ch] = 0;
             max_nbits_gr[gr] += max_bits[gr][ch];
             max_nbits_fr += max_bits[gr][ch];
+            /* v4 default (owner decision 2026-07-09, FINDINGS Finding 7): the bi-predicate
+               search replaces the 2001 tri search for every measured -V encode. The tri
+               margin was audibly less faithful than the corrected search on real material
+               (blind 14/16 and 16/16 with stock holding a bitrate advantage; the artifact
+               is the margin's inconsistent frame-to-frame bit spend, audible as a phasey
+               swirl on quiet cymbals). The fast path (full_outer_loop < 0) keeps guess.
+               The regress baseline was deliberately re-locked for the V cases with this
+               change; CBR/ABR cases are untouched. */
             if (cfg->quality_max)
                 that_[gr][ch].find = qmax_find_sf();
             else
-                that_[gr][ch].find = (cfg->full_outer_loop < 0) ? guess_scalefac_x34 : find_scalefac_x34;
+                that_[gr][ch].find = (cfg->full_outer_loop < 0) ? guess_scalefac_x34 : find_scalefac_x34_bin_bi;
             that_[gr][ch].gfc = gfc;
             that_[gr][ch].cod_info = &gfc->l3_side.tt[gr][ch];
             that_[gr][ch].xr34orig = xr34orig[gr][ch];
