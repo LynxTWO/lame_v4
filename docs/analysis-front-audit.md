@@ -92,3 +92,37 @@ granule bit targets per frame, so its worker can run channel 1's *whole frame* -
 granules, in order, preserving the CurrentStep chain - amortizing channel imbalance across
 granules and halving sync points. CBR cannot: granule 1's targets depend on granule 0's
 reservoir accounting, so its 1.17x at 128 kbps is close to structural.)
+
+## Implemented and measured (2026-07-10): a dead end, reverted with receipts
+
+Decompositions (1)+(2) were built exactly as designed: the Finding 4 worker gained a
+generic function-pointer job, the psymodel forked L/R (private `fftenergy`, M/S and
+`MS_thresholds` sequential after the join), the MDCT forked per channel, and the worker
+start was widened to every stereo session with the quantize dispatch keeping its own
+CBR/ABR-and-no-substep eligibility.
+
+The correctness argument held completely: bit-exact gate 70 of 70 on the sequential path,
+and threads-on vs threads-off hash-identical on 21 of 21 setting-x-file combinations
+(V2/V5/CBR128/CBR320/ABR192/quality-max/mono across music, castanets and mix material -
+the short-block fork included).
+
+The performance did not. Best-of-three wall times on an idle 5950X, full 400 Lux track:
+
+| Setting | sequential | `--threads 2` | speedup |
+| --- | --- | --- | --- |
+| default `-V4` | 2.84 s | 5.48 s | 0.52x |
+| `-V2` | 2.99 s | 5.68 s | 0.53x |
+| `-q0` CBR128 | 3.42 s | 6.09 s | 0.56x |
+| CBR320 | 2.83 s | 5.78 s | 0.49x |
+| quality-max CBR320 | 84.2 s | 55.3 s | 1.52x (quantize threading, unharmed) |
+
+The arithmetic closes the case: ~9,400 granules x ~4 fork/joins x ~70 us of Win32
+auto-reset-event wake latency is ~2.6 s of pure synchronization - the entire observed
+gap - against an Amdahl ceiling of ~0.4 s of parallelizable analysis work. Kernel-event
+handoff at analysis granularity costs roughly six times the work it parallelizes. A
+user-space spin handoff could plausibly reach the predicted ~1.15x, but that buys four
+seconds per album on encodes already running ~90x realtime, in exchange for a lock-free
+protocol inside 25-year-old global-state code. Option 4's judgment stands measured: per-
+file default-speed is nobody's bottleneck. The fork wiring was reverted the same session
+(gates re-verified green); this section is the receipt, and the audit above remains the
+map for anyone who someday has a real latency requirement.

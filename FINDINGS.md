@@ -1269,6 +1269,7 @@ look excellent right up until the material is unseen.
 | Podcast optimizer v2 | landed; true VBR wins at equal measured bitrate |
 | Fractional ABR | landed, regress-gated |
 | Equal-measured-size harness | landed; first result: quality-max was a no-op for modern VBR (resolved by Finding 7) |
+| Analysis-front threading (audit decompositions 1+2) | implemented, proven bit-exact (70/70 + 21/21 threads parity), measured 0.49-0.56x at defaults - Win32 event wake latency (~70 us x ~4 fork/joins per granule) is ~6x the parallelizable work; reverted same session, receipts in docs/analysis-front-audit.md |
 | Adaptive `res_factor` (year-2000 TODO) | tested, null: ABR undershoot is demand-limited; reverted |
 | CMake build | bit-identical to nmake baseline on MSVC |
 | CI + fuzz + docs lint | live and green at LynxTWO/lame_v4 |
