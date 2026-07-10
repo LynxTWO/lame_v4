@@ -927,7 +927,7 @@ Five validated opt-in configurations, none a default change:
 | `-q 0 -b 320` | campaign-8 winner above | -1.81 / -2.81 |
 | `-q 0 --abr 192` | `--ns-bass -5.00 --shortthreshold 4.19,23.83` | -0.22 / -0.31 |
 | `--quality-max -b 128` | campaign-10 winner | -0.10 |
-| `-V` at 128 kbps measured | `--ns-bass -1.50` (campaign 12, stability-gated; ABX: no audible difference on the flagged pairs; re-validated against the Finding 7 default: -0.29, 16 of 16, one stability flag on h11 at +0.355 relative to the much-steadier new baseline - absolute stability still well below the old stock's; optional pair in `tests/abx/pref12b/`) | -0.25 / -0.31 |
+| `-V` at 128 and ~190 kbps measured | `--ns-bass -1.50` (campaign 12, stability-gated; ABX: no audible difference on the flagged pairs; re-validated against the Finding 7 default: 128 kbps -0.29 with 16 of 16 and one h11 stability flag at +0.355 relative to the much-steadier new baseline (optional pair in `tests/abx/pref12b/`); ~190 kbps -0.30 with 16 of 16 and the stability column clean, worst +0.033) | -0.25 / -0.31 |
 
 The campaign-11 winner is **demoted** (2026-07-06): audibly different at equal size (ABX
 16/16), but an anchored blind fidelity round judged stock closer to the original on 5 of
@@ -1013,6 +1013,13 @@ bytes). A cross-build check at matched measured rates confirmed the receipts tra
 stays as the measurement harness; value 5 selects the pre-v4 stock search for A/B. The
 project's rule held: this shipped default-on only after the audible receipt, exactly as
 Finding 1 did.
+
+Rate generalization (2026-07-09, the `-V2` class): at equal measured ~190 kbps the old
+tri search scores worse on 14 of 16 h-files, mean +0.180 dB, stability flat - the gain
+shrinks with the error floor, as expected, but keeps its sign corpus-wide. The two
+exceptions: h09 is a ceiling row at unequal sizes, and h06's -0.11 for the old search
+comes with +0.17 audNMR and +0.22 stability against it. The default stands at both
+measured rate classes.
 
 Stability read (2026-07-09, after the swirl meter existed): this mode **improves** HF
 temporal stability - h-set mean hfStab -0.279 with a worst per-file delta of exactly
@@ -1270,7 +1277,7 @@ look excellent right up until the material is unseen.
 
 | Item | Why it matters |
 | --- | --- |
-| Quality-max VBR at other rates | Finding 7 and campaign 11 were both validated at 128 kbps measured; `-V 2`-class rates (~190 kbps) should be spot-checked with the same equal-size harness before either is recommended there |
+| `-V 2`-class rate checks | DONE 2026-07-09: the Finding 7 default beats the old search on 14 of 16 h-files at ~190 kbps (+0.180 for the old search, stability flat), and the campaign-12 config transfers cleanly (-0.300, 16 of 16, stability worst +0.033). Both stand at both measured rate classes |
 | Re-validate the campaign-12 config against the new default | `--ns-bass -1.50`'s receipts were measured against the old tri-search baseline; with the corrected search now the `-V` default, one validate run confirms (or retires) the config on the new baseline |
 | Listening: stability-flag pairs S1 and S2 | the legacy audit flagged one file per CBR config (h05 at CBR 128 +0.295, h06 at CBR 320 +0.527); both configs' ABX nulls were on other material. Optional - the flags do not revoke validated status, they bound it |
 | Optional: focused short-clip ABX re-tests | looped short excerpts are sharper instruments than full dense tracks if a difference verdict is ever needed on small deltas |
