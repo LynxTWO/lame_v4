@@ -1174,6 +1174,15 @@ The first live runs earned their keep: they caught a real 25-year-old portabilit
 (config.h defined the stdint type names as macros, fatal against modern glibc) and proved
 the meter bit-deterministic across platforms. First fuzz campaign: zero crashes.
 
+The long campaign followed (2026-07-10): **121.8 million adversarial inputs in 4 hours**,
+12 fork-mode workers under ASan, seeds spanning MPEG1/2/2.5, CRC frames, free format,
+mono and VBR. **Zero crashes, zero OOMs, zero timeouts.** Coverage grew from the seeds'
+441 edges to 1,947 (5,104 features) and plateaued well before the end - the reachable
+decoder surface for this harness is saturated, at roughly 240x the per-push CI depth.
+The evolved 1,252-item corpus stays local (its seeds derive from copyrighted excerpts,
+and corpus audio never enters the repo); the harness and recipe are committed, so the
+campaign reproduces from scratch.
+
 `tests/lint-docs.sh` fails CI when tracked Markdown contains typographic Unicode (em
 dashes, arrows, checkmarks). Writing rules live in `docs/writing-guide.md`.
 
