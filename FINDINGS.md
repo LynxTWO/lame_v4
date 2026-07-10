@@ -927,7 +927,7 @@ Five validated opt-in configurations, none a default change:
 | `-q 0 -b 320` | campaign-8 winner above | -1.81 / -2.81 |
 | `-q 0 --abr 192` | `--ns-bass -5.00 --shortthreshold 4.19,23.83` | -0.22 / -0.31 |
 | `--quality-max -b 128` | campaign-10 winner | -0.10 |
-| `-V` at 128 kbps measured | `--ns-bass -1.50` (campaign 12, stability-gated; ABX: no audible difference on the flagged pairs) | -0.25 / -0.31 |
+| `-V` at 128 kbps measured | `--ns-bass -1.50` (campaign 12, stability-gated; ABX: no audible difference on the flagged pairs; re-validated against the Finding 7 default: -0.29, 16 of 16, one stability flag on h11 at +0.355 relative to the much-steadier new baseline - absolute stability still well below the old stock's; optional pair in `tests/abx/pref12b/`) | -0.25 / -0.31 |
 
 The campaign-11 winner is **demoted** (2026-07-06): audibly different at equal size (ABX
 16/16), but an anchored blind fidelity round judged stock closer to the original on 5 of
