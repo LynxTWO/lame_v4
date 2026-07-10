@@ -31,6 +31,8 @@
 #endif
 
 
+#include <stdlib.h>
+
 #include "lame.h"
 #include "machine.h"
 
@@ -516,6 +518,27 @@ lame_init_qval(lame_global_flags * gfp)
            --quality-max exists to spend that, and --threads 2 recovers up to a third of it
            bit-exactly. */
         cfg->full_outer_loop = 1;
+        /* (3) shaping strategy for the exhaustive walk (2026-07-10 quantizer-loop audit):
+           amp=1 ("amplify bands within 50% of max") replaces the inherited amp=3 for
+           quality-max CBR. Finding 1's amp=3 was the right medicine for the
+           EARLY-STOPPING q0 loop; under this mode's full_outer_loop=1 walk the two-pass
+           refine is vestigial, and amp=1 feeds the aggregate objective a better
+           candidate path: with the bestlen fix (quantize.c), val 12/12 better at both
+           rates, h-set -0.024 (11/16, none worse) at CBR128 and -0.062 (15/16, none
+           worse, audNMR -0.106) at CBR320. ABR measured WORSE with either change
+           (amp=1 alone: +0.014, 1 better of 16) and keeps amp=3. */
+        if (cfg->vbr == vbr_off) {
+            cfg->noise_shaping_amp = 1;
+        }
+        /* (4) audit harness: LAME_QMAX_NSAMP overrides the strategy (0..3) for A/B;
+           Finding 3's env sweep covered the objective (QC/QCS/FOL), this covers the
+           candidate path. The override wins over (3). */
+        {
+            char const *env = getenv("LAME_QMAX_NSAMP");
+            if (env != NULL && env[0] >= '0' && env[0] <= '3' && env[1] == '\0') {
+                cfg->noise_shaping_amp = env[0] - '0';
+            }
+        }
     }
 }
 

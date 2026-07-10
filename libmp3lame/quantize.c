@@ -41,6 +41,24 @@
 #include "vector/lame_intrin.h"
 #endif
 
+#include <stdlib.h>
+
+/* v4 quantizer-loop audit (the CBR-side follow-up to Finding 7). Shipped rule for the
+   outer_loop stale-best quirk (see its comment at the use site): fixed for quality-max
+   CBR sessions (measured -0.031 val / part of -0.062 h-set at 320, a no-op at 128),
+   historical for ABR (the fix alone measured WORSE there: +0.012, 0 better of 16) and
+   for every non-quality-max mode. LAME_QMAX_BESTLEN=0/1 forces either behavior for A/B. */
+static int
+qmax_bestlen_mode(void)
+{
+    static int cached = -2;     /* -1 = follow the shipped rule; 0/1 = forced */
+    if (cached == -2) {
+        char const *env = getenv("LAME_QMAX_BESTLEN");
+        cached = env ? atoi(env) : -1;
+    }
+    return cached;
+}
+
 
 
 
@@ -1045,6 +1063,8 @@ outer_loop(lame_internal_flags * gfc, gr_info * const cod_info, const FLOAT * co
     int     bEndOfSearch = 0;
     int     bRefine = 0;
     int     best_ggain_pass1 = 0;
+    int const bestlen_fix = cfg->quality_max
+        && (qmax_bestlen_mode() < 0 ? (cfg->vbr == vbr_off) : qmax_bestlen_mode());
 
     (void) bin_search_StepSize(gfc, cod_info, targ_bits, ch, xrpow);
 
@@ -1156,7 +1176,16 @@ outer_loop(lame_internal_flags * gfc, gr_info * const cod_info, const FLOAT * co
 
             /* save data so we can restore this quantization later */
             if (better) {
-                best_part2_3_length = cod_info->part2_3_length;
+                /* Historical quirk (mt 5/99 era): this records the PREVIOUS best's
+                   length - cod_info is overwritten below - so the once-clean
+                   bits-reduction threshold above lags one generation behind the
+                   actual best. quality-max CBR records the winner's length
+                   (noise_info.bits == cod_info_w.part2_3_length); see
+                   qmax_bestlen_mode for the shipped scoping and receipts. */
+                if (bestlen_fix)
+                    best_part2_3_length = noise_info.bits;
+                else
+                    best_part2_3_length = cod_info->part2_3_length;
                 best_noise_info = noise_info;
                 *cod_info = cod_info_w;
                 age = 0;

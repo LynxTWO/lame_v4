@@ -355,6 +355,38 @@ meter readings of -7.05 vs -6.00 there), and did not survive blinding. The owner
 summary of why: "my brain would trick me and hear the same passage in different ways." That
 is what ABX is for.
 
+#### The 2026 loop audit: strategy and threshold refinements for the exhaustive walk
+
+The CBR-side follow-up to Finding 7's search audit (2026-07-10) put two never-measured
+mechanisms of `outer_loop` under the meter, both env-gated for A/B and both settled at
+equal size (CBR: equal by construction).
+
+First, the shaping strategy. Finding 1 shipped `noise_shaping_amp=3` for q0 CBR/ABR
+because the early-stopping loop starves under one-band-per-iteration amplification. This
+mode's exhaustive walk (`full_outer_loop=1`) has no early stop, so that medicine is
+vestigial here - and a sweep (`LAME_QMAX_NSAMP`) found amp=1, the amplify-within-50%-of-
+max trigger, feeds the aggregate objective a better candidate path. Second, a 1999-era
+quirk: `best_part2_3_length` records the PREVIOUS best's bit count (the assignment reads
+`cod_info` one line before it is overwritten), so the once-clean bits-reduction threshold
+lags a generation. A no-op at 128 kbps; at 320, where the once-clean path dominates,
+fixing it (`LAME_QMAX_BESTLEN`) measured -0.031 on val.
+
+The combination, at equal size:
+
+| Mode | val (12) | h-set (16) | audNMR | stability |
+| --- | --- | --- | --- | --- |
+| quality-max CBR 128 | -0.036, 12 of 12 | -0.024, 11 better 0 worse | flat | worst +0.150 |
+| quality-max CBR 320 | -0.068, 12 of 12 | **-0.062, 15 better 0 worse** | **-0.106** | flat |
+| quality-max ABR 192 | not swept | **+0.028, 0 better 13 worse** | +0.031 | +0.026 |
+
+ABR rejected both components independently (amp=1 alone +0.014 with 1 better of 16; the
+threshold fix alone +0.012 with 0 better), so the ship is scoped exactly like Finding 1
+was: **quality-max CBR gets amp=1 and the corrected threshold; ABR keeps the historical
+behavior**; nothing outside quality-max changes. Ship parity receipts: the shipped
+build's qmax CBR output is byte-identical to the measured combo, its qmax ABR output
+byte-identical to the pre-change baseline, and the 70-case gate is untouched. The env
+knobs stay as the A/B harness.
+
 #### Status
 
 Merged (`c1034a2`). Scoped to CBR/ABR like Finding 1; the objective override lives in
@@ -363,7 +395,8 @@ clobbered. VBR keeps stock objectives until an equal-size methodology exists. AB
 adversarial track: no audible regression, no audible difference (log in `tests/abx/`). The
 mode's case rests on the corpus-wide measurements. A reproduction note: cross-build LTCG
 floating-point wobble makes absolute corpus means drift by ~0.02 dB between binaries; all
-decisions here used same-binary deltas.
+decisions here used same-binary deltas. The 2026 loop audit above sharpened the CBR side
+further (-0.024/-0.062 on the library holdout at 128/320).
 
 ---
 
@@ -1279,6 +1312,7 @@ look excellent right up until the material is unseen.
 | Fractional ABR | landed, regress-gated |
 | Equal-measured-size harness | landed; first result: quality-max was a no-op for modern VBR (resolved by Finding 7) |
 | Analysis-front threading (audit decompositions 1+2) | implemented, proven bit-exact (70/70 + 21/21 threads parity), measured 0.49-0.56x at defaults - Win32 event wake latency (~70 us x ~4 fork/joins per granule) is ~6x the parallelizable work; reverted same session, receipts in docs/analysis-front-audit.md |
+| Quantizer-loop audit (Finding 3 follow-up) | quality-max CBR ships amp=1 + the corrected once-clean threshold: h-set -0.024/-0.062 at 128/320 with none worse; ABR measured worse with either change and keeps historical behavior; ship parity byte-verified both ways |
 | Adaptive `res_factor` (year-2000 TODO) | tested, null: ABR undershoot is demand-limited; reverted |
 | CMake build | bit-identical to nmake baseline on MSVC |
 | CI + fuzz + docs lint | live and green at LynxTWO/lame_v4 |
